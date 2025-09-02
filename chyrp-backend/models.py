@@ -1,7 +1,6 @@
 # models.py
 
-from sqlalchemy import (Column, DateTime, ForeignKey, Integer, String, Table,
-                        JSON, Boolean)  # Add Boolean import
+from sqlalchemy import (Column, DateTime, ForeignKey, Integer, String, Table, JSON, Boolean)  # Add Boolean import
 from sqlalchemy.orm import relationship
 from database import Base
 import datetime

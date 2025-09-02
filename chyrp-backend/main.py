@@ -18,7 +18,8 @@ from dependencies import (
     create_access_token, 
     get_password_hash, 
     verify_password,
-    require_post_permission # <-- ADD THIS IMPORT
+    require_permission,      # <-- ADD THIS IMPORT
+    require_post_permission  # <-- EXISTING IMPORT
 )
 from routers import interactions
 
@@ -60,7 +61,7 @@ def create_initial_data():
             print("Database is empty. Seeding initial data...")
             
             # Create Groups
-            admin_permissions = ["edit_post", "delete_post", "add_user", "edit_user", "delete_user", "add_group", "edit_group", "delete_group", "like_post"]
+            admin_permissions = ["edit_post", "delete_post", "add_user", "edit_user", "delete_user", "add_group", "edit_group", "delete_group", "like_post", "add_post", "edit_own_post", "delete_own_post"]  # Added missing permissions for admin
             member_permissions = ["add_post", "edit_own_post", "delete_own_post", "like_post"]
             admin_group = models.Group(name="Admin", permissions=admin_permissions)
             member_group = models.Group(name="Member", permissions=member_permissions)
@@ -138,7 +139,12 @@ def read_groups(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 
 # --- Posts/Pages Endpoints ---
 @app.post("/posts/", response_model=schemas.PostModel, tags=["Posts"])
-def create_post(post: schemas.PostCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def create_post(
+    post: schemas.PostCreate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user),
+    _: None = Depends(require_permission(["add_post"]))  # <-- ADD THIS PERMISSION CHECK
+):
     db_post = models.Post(**post.dict(), user_id=current_user.id)
     db.add(db_post)
     db.commit()
