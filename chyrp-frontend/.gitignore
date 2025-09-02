@@ -18,7 +18,7 @@ dist-ssr
 .idea
 .DS_Store
 *.suo
-*.ntvs*
+*.ntvs*Add .env to your .gitignore file to prevent committing sensitive data to version control.
 *.njsproj
 *.sln
 *.sw?
