@@ -3,6 +3,13 @@
 import datetime
 from typing import List, Optional
 
+# Add upload-related imports
+from fastapi import UploadFile, File, Form
+from fastapi.staticfiles import StaticFiles
+import os, shutil
+from pathlib import Path
+from uuid import uuid4
+
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -31,6 +38,13 @@ app = FastAPI(
     description="API for the modern Chyrp blogging engine.",
     version="1.0.0",
 )
+
+# Directory to store uploaded files
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Serve /uploads/<filename> as static files in dev
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # --- CORS Middleware ---
 origins = [
@@ -145,6 +159,11 @@ def create_post(
     current_user: models.User = Depends(get_current_user),
     _: None = Depends(require_permission(["add_post"]))  # <-- ADD THIS PERMISSION CHECK
 ):
+    # Prevent duplicate slug (clean)
+    existing = db.query(models.Post).filter(models.Post.clean == post.clean).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="A post with this slug already exists.")
+        
     db_post = models.Post(**post.dict(), user_id=current_user.id)
     db.add(db_post)
     db.commit()
@@ -194,3 +213,134 @@ def delete_post(
     db.delete(db_post)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+# ===============================================================================
+# 4. UPLOAD ENDPOINTS
+# ===============================================================================
+
+@app.post("/upload", tags=["Uploads"])
+async def upload_file(file: UploadFile = File(...), current_user: models.User = Depends(get_current_user)):
+    # Ensure uploads directory exists
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+    # Generate unique filename preserving extension
+    ext = os.path.splitext(file.filename)[1]
+    unique_name = f"{uuid4().hex}{ext}"
+    dest_path = os.path.join(UPLOAD_DIR, unique_name)
+
+    with open(dest_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    file_url = f"/uploads/{unique_name}"
+    return {"url": file_url, "filename": file.filename}
+
+@app.post("/posts/photo", response_model=schemas.PostModel, tags=["Posts"])
+async def create_photo_post(
+    clean: str = Form(...),
+    title: Optional[str] = Form(None),
+    status: str = Form("public"),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    # Prevent duplicate slug
+    existing = db.query(models.Post).filter(models.Post.clean == clean).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="A post with this slug already exists.")
+
+    # Save file
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    ext = os.path.splitext(file.filename)[1]
+    unique_name = f"{uuid4().hex}{ext}"
+    dest_path = os.path.join(UPLOAD_DIR, unique_name)
+
+    with open(dest_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    file_url = f"/uploads/{unique_name}"
+
+    # Create a post whose body is the image URL and feather is 'photo'
+    db_post = models.Post(
+        content_type="post",
+        feather="photo",
+        title=title,
+        body=file_url,
+        clean=clean,
+        status=status,
+        user_id=current_user.id,
+    )
+    db.add(db_post)
+    db.commit()
+    db.refresh(db_post)
+    return db_post
+
+@app.post("/posts/quote", response_model=schemas.PostModel, tags=["Posts"])
+async def create_quote_post(
+    clean: str = Form(...),
+    quote: str = Form(...),
+    attribution: str = Form(...),
+    status: str = Form("public"),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    # Prevent duplicate slug
+    existing = db.query(models.Post).filter(models.Post.clean == clean).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="A post with this slug already exists.")
+
+    # Create quote body with attribution
+    quote_body = f'"{quote}"\n\n— {attribution}'
+
+    # Create a post with feather 'quote'
+    db_post = models.Post(
+        content_type="post",
+        feather="quote",
+        title=None,  # Quotes typically don't have titles
+        body=quote_body,
+        clean=clean,
+        status=status,
+        user_id=current_user.id,
+    )
+    db.add(db_post)
+    db.commit()
+    db.refresh(db_post)
+    return db_post
+
+@app.post("/posts/link", response_model=schemas.PostModel, tags=["Posts"])
+async def create_link_post(
+    clean: str = Form(...),
+    title: str = Form(...),
+    url: str = Form(...),
+    description: Optional[str] = Form(None),
+    status: str = Form("public"),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    # Prevent duplicate slug
+    existing = db.query(models.Post).filter(models.Post.clean == clean).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="A post with this slug already exists.")
+
+    # Validate URL format
+    if not url.startswith(('http://', 'https://')):
+        url = f'https://{url}'
+
+    # Create link body with description
+    link_body = f'**{title}**\n\n[{url}]({url})'
+    if description:
+        link_body += f'\n\n{description}'
+
+    # Create a post with feather 'link'
+    db_post = models.Post(
+        content_type="post",
+        feather="link",
+        title=title,
+        body=link_body,
+        clean=clean,
+        status=status,
+        user_id=current_user.id,
+    )
+    db.add(db_post)
+    db.commit()
+    db.refresh(db_post)
+    return db_post

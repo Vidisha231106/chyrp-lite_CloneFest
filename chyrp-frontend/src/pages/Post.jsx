@@ -23,8 +23,8 @@ const Post = () => {
         // Fetch the current user profile (will fail if not logged in)
         const userResponse = await apiClient.get('/users/me');
         setCurrentUser(userResponse.data);
-      } catch (error) {
-        console.error("Error fetching data:", error);
+      } catch {
+        console.error("Error fetching data");
       } finally {
         setLoading(false);
       }
@@ -37,7 +37,7 @@ const Post = () => {
       try {
         await apiClient.delete(`/posts/${postId}`);
         navigate('/');
-      } catch (error) {
+      } catch{
         alert('Failed to delete post. You may not have permission.');
       }
     }
@@ -47,7 +47,7 @@ const Post = () => {
     try {
       await apiClient.post(`/posts/${postId}/like`);
       alert(`Toggled like for post ${postId}!`);
-    } catch (error) {
+    } catch {
       alert("You must be logged in to like a post.");
     }
   };
@@ -78,7 +78,52 @@ const canDelete = currentUser && (
         </div>
       </header>
       <div className="post-content">
-        <ReactMarkdown>{post.body || ''}</ReactMarkdown>
+        {/* Enhanced content display for different post types */}
+        {post.feather === 'photo' && post.body?.startsWith('/uploads/') ? (
+          <img 
+            src={`http://127.0.0.1:8000${post.body}`} 
+            alt={post.title || post.clean} 
+            style={{ maxWidth: '100%', height: 'auto' }} 
+          />
+        ) : post.feather === 'quote' ? (
+          <blockquote style={{
+            borderLeft: '4px solid #007bff',
+            paddingLeft: '20px',
+            margin: '20px 0',
+            fontStyle: 'italic',
+            fontSize: '1.2em',
+            lineHeight: '1.6',
+            color: '#333'
+          }}>
+            <ReactMarkdown>{post.body || ''}</ReactMarkdown>
+          </blockquote>
+        ) : post.feather === 'link' ? (
+          <div style={{
+            border: '1px solid #ddd',
+            borderRadius: '8px',
+            padding: '20px',
+            margin: '20px 0',
+            backgroundColor: '#f9f9f9'
+          }}>
+            <ReactMarkdown 
+              components={{
+                a: ({ href, children }) => (
+                  <a href={href} target="_blank" rel="noopener noreferrer" style={{ 
+                    color: '#007bff', 
+                    textDecoration: 'underline',
+                    fontWeight: 'bold'
+                  }}>
+                    {children} 🔗
+                  </a>
+                )
+              }}
+            >
+              {post.body || ''}
+            </ReactMarkdown>
+          </div>
+        ) : (
+          <ReactMarkdown>{post.body || ''}</ReactMarkdown>
+        )}
       </div>
       <footer className="post-footer">
         <button onClick={handleLike} className="btn-like">❤️ Like</button>
