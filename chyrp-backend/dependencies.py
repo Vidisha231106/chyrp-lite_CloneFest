@@ -8,13 +8,16 @@ from fastapi.security import APIKeyHeader
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-
+import os
+from dotenv import load_dotenv
 import models
 import schemas
 from database import SessionLocal
 
 # --- Configuration ---
-SECRET_KEY = "your-super-secret-key-that-is-long-and-random"
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

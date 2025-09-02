@@ -1,7 +1,7 @@
 # models.py
 
 from sqlalchemy import (Column, DateTime, ForeignKey, Integer, String, Table,
-                        JSON)
+                        JSON, Boolean)  # Add Boolean import
 from sqlalchemy.orm import relationship
 from database import Base
 import datetime
@@ -71,7 +71,7 @@ class Post(Base):
     feather = Column(String, nullable=True)
     clean = Column(String, unique=True, index=True)
     status = Column(String, default="public")
-    pinned = Column(Integer, default=0)
+    pinned = Column(Boolean, default=False)  # Changed from Integer to Boolean
     title = Column(String, nullable=True)
     body = Column(String, nullable=True)
     parent_id = Column(Integer, ForeignKey("posts.id"), nullable=True)
