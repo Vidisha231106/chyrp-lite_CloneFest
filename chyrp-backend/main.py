@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from sqlalchemy import or_, and_
 
 # Add upload-related imports
 from fastapi import UploadFile, File, Form
@@ -29,6 +30,7 @@ from dependencies import (
     get_password_hash, 
     verify_password,
     require_permission,      # <-- ADD THIS IMPORT
+    get_optional_current_user,
     require_post_permission  # <-- EXISTING IMPORT
 )
 from routers import interactions
@@ -171,7 +173,15 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Default 'Member' group not found.")
     
     hashed_password = get_password_hash(user.password)
-    db_user = models.User(login=user.login, email=user.email, full_name=user.full_name, hashed_password=hashed_password, group_id=member_group.id)
+    # Add is_active=True to the user creation
+    db_user = models.User(
+        login=user.login, 
+        email=user.email, 
+        full_name=user.full_name, 
+        hashed_password=hashed_password, 
+        group_id=member_group.id,
+        is_active=True  # <-- ADD THIS LINE
+    )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -214,12 +224,37 @@ def create_post(
     db.refresh(db_post)
     return db_post
 
+# --- MODIFIED: Update the read_posts endpoint ---
 @app.get("/posts/", response_model=List[schemas.PostModel], tags=["Posts"])
-def read_posts(content_type: Optional[str] = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_posts(
+    content_type: Optional[str] = None, 
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(get_optional_current_user) # <-- USE NEW DEPENDENCY
+):
     query = db.query(models.Post)
+
+    if current_user:
+        # If user is logged in, show them all public posts OR their own drafts
+        query = query.filter(
+            or_(
+                models.Post.status == 'public',
+                and_(
+                    models.Post.user_id == current_user.id,
+                    models.Post.status == 'draft'
+                )
+            )
+        )
+    else:
+        # If user is not logged in, only show public posts
+        query = query.filter(models.Post.status == 'public')
+
     if content_type:
         query = query.filter(models.Post.content_type == content_type)
-    posts = query.offset(skip).limit(limit).all()
+    
+    # Order by creation date, newest first, before applying pagination
+    posts = query.order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
     return posts
 
 @app.get("/posts/{post_id}", response_model=schemas.PostModel, tags=["Posts"])

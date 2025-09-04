@@ -120,3 +120,20 @@ def require_post_permission(perm_any: str, perm_own: str):
             detail=f"You do not have permission to perform this action.",
         )
     return checker
+
+# --- NEW: Add a dependency for OPTIONAL user authentication ---
+async def get_optional_current_user(token: str = Depends(api_key_scheme), db: Session = Depends(get_db)):
+    """
+    Dependency to get the current user if a valid token is provided,
+    but does not raise an exception if the token is missing or invalid.
+    Returns the user object or None.
+    """
+    if token is None:
+        return None
+    try:
+        # Re-use the logic from get_current_user
+        user = await get_current_user(token, db)
+        return user
+    except HTTPException:
+        # If token is invalid or user not found, simply return None
+        return None
