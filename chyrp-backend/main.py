@@ -3,11 +3,12 @@
 import datetime
 from typing import List, Optional
 
+from dotenv import load_dotenv
+from supabase import create_client, Client
+
 # Add upload-related imports
 from fastapi import UploadFile, File, Form
-from fastapi.staticfiles import StaticFiles
-import os, shutil
-from pathlib import Path
+import os
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Response, status
@@ -39,12 +40,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Directory to store uploaded files
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# Serve /uploads/<filename> as static files in dev
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise Exception("Supabase credentials not found in .env file")
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+BUCKET_NAME = "media_uploads"  # The name of the bucket you created in Supabase
+
 
 # --- CORS Middleware ---
 origins = [
@@ -220,19 +225,34 @@ def delete_post(
 
 @app.post("/upload", tags=["Uploads"])
 async def upload_file(file: UploadFile = File(...), current_user: models.User = Depends(get_current_user)):
-    # Ensure uploads directory exists
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
+    # --- MODIFIED: Replaced local file saving with Supabase upload ---
+    
     # Generate unique filename preserving extension
     ext = os.path.splitext(file.filename)[1]
     unique_name = f"{uuid4().hex}{ext}"
-    dest_path = os.path.join(UPLOAD_DIR, unique_name)
+    
+    try:
+        # Read file content into memory
+        contents = await file.read()
 
-    with open(dest_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        # Upload to Supabase Storage
+        supabase.storage.from_(BUCKET_NAME).upload(
+            path=unique_name, 
+            file=contents,
+            file_options={"content-type": file.content_type}
+        )
 
-    file_url = f"/uploads/{unique_name}"
+        # Get the public URL
+        file_url = supabase.storage.from_(BUCKET_NAME).get_public_url(unique_name)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
+    
+    finally:
+        await file.close()
+
     return {"url": file_url, "filename": file.filename}
+
 
 @app.post("/posts/photo", response_model=schemas.PostModel, tags=["Posts"])
 async def create_photo_post(
@@ -248,18 +268,26 @@ async def create_photo_post(
     if existing:
         raise HTTPException(status_code=400, detail="A post with this slug already exists.")
 
-    # Save file
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    # --- MODIFIED: Replaced local file saving with Supabase upload ---
     ext = os.path.splitext(file.filename)[1]
     unique_name = f"{uuid4().hex}{ext}"
-    dest_path = os.path.join(UPLOAD_DIR, unique_name)
 
-    with open(dest_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        contents = await file.read()
+        supabase.storage.from_(BUCKET_NAME).upload(
+            path=unique_name,
+            file=contents,
+            file_options={"content-type": file.content_type}
+        )
+        file_url = supabase.storage.from_(BUCKET_NAME).get_public_url(unique_name)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
+    
+    finally:
+        await file.close()
 
-    file_url = f"/uploads/{unique_name}"
-
-    # Create a post whose body is the image URL and feather is 'photo'
+    # Create a post whose body is the image URL from Supabase
     db_post = models.Post(
         content_type="post",
         feather="photo",

@@ -37,7 +37,7 @@ const Post = () => {
       try {
         await apiClient.delete(`/posts/${postId}`);
         navigate('/');
-      } catch{
+      } catch {
         alert('Failed to delete post. You may not have permission.');
       }
     }
@@ -55,15 +55,15 @@ const Post = () => {
   if (loading) return <p>Loading...</p>;
   if (!post) return <h1>Post not found</h1>;
 
-const canEdit = currentUser && (
-  currentUser.group.permissions.includes('edit_post') ||
-  (currentUser.id === post.owner.id && currentUser.group.permissions.includes('edit_own_post'))
-);
+  const canEdit = currentUser && (
+    currentUser.group.permissions.includes('edit_post') ||
+    (currentUser.id === post.owner.id && currentUser.group.permissions.includes('edit_own_post'))
+  );
 
-const canDelete = currentUser && (
-  currentUser.group.permissions.includes('delete_post') ||
-  (currentUser.id === post.owner.id && currentUser.group.permissions.includes('delete_own_post'))
-);
+  const canDelete = currentUser && (
+    currentUser.group.permissions.includes('delete_post') ||
+    (currentUser.id === post.owner.id && currentUser.group.permissions.includes('delete_own_post'))
+  );
 
   return (
     <div className="post-page">
@@ -79,11 +79,11 @@ const canDelete = currentUser && (
       </header>
       <div className="post-content">
         {/* Enhanced content display for different post types */}
-        {post.feather === 'photo' && post.body?.startsWith('/uploads/') ? (
-          <img 
-            src={`http://127.0.0.1:8000${post.body}`} 
-            alt={post.title || post.clean} 
-            style={{ maxWidth: '100%', height: 'auto' }} 
+        {post.feather === 'photo' ? (
+          <img
+            src={post.body}
+            alt={post.title || post.clean}
+            style={{ maxWidth: '100%', height: 'auto' }}
           />
         ) : post.feather === 'quote' ? (
           <blockquote style={{
@@ -105,11 +105,11 @@ const canDelete = currentUser && (
             margin: '20px 0',
             backgroundColor: '#f9f9f9'
           }}>
-            <ReactMarkdown 
+            <ReactMarkdown
               components={{
                 a: ({ href, children }) => (
-                  <a href={href} target="_blank" rel="noopener noreferrer" style={{ 
-                    color: '#007bff', 
+                  <a href={href} target="_blank" rel="noopener noreferrer" style={{
+                    color: '#007bff',
                     textDecoration: 'underline',
                     fontWeight: 'bold'
                   }}>

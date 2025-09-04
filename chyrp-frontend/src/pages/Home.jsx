@@ -56,16 +56,16 @@ const Home = () => {
                     <Link to={`/posts/${post.id}`}>{post.title || post.clean}</Link>
                   </h3>
                   {/* Enhanced content display for different post types */}
-                  {post.feather === 'photo' && post.body?.startsWith('/uploads/') ? (
+                  {post.feather === 'photo' ? (
                     <Link to={`/posts/${post.id}`}>
                       <img
-                        src={`http://127.0.0.1:8000${post.body}`}
+                        src={post.body}
                         alt={post.title || post.clean}
-                        style={{ 
-                          width: '100%', 
-                          height: '220px', 
-                          objectFit: 'cover', 
-                          borderRadius: '8px' 
+                        style={{
+                          width: '100%',
+                          height: '220px',
+                          objectFit: 'cover',
+                          borderRadius: '8px'
                         }}
                       />
                     </Link>
@@ -78,14 +78,14 @@ const Home = () => {
                       backgroundColor: '#f9f9f9',
                       fontSize: '0.9em'
                     }}>
-                      <strong>🔗 Link Post</strong><br/>
+                      <strong>🔗 Link Post</strong><br />
                       {(() => {
                         // Extract URL from the post body
                         const urlMatch = post.body?.match(/https?:\/\/[^\s]+/);
                         const url = urlMatch ? urlMatch[0] : null;
                         return url ? (
-                          <a href={url} target="_blank" rel="noopener noreferrer" style={{ 
-                            color: '#007bff', 
+                          <a href={url} target="_blank" rel="noopener noreferrer" style={{
+                            color: '#007bff',
                             textDecoration: 'underline',
                             fontWeight: 'bold'
                           }}>
