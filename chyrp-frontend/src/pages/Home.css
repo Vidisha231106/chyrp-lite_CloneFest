@@ -151,3 +151,22 @@
     padding: 1.25rem;
   }
 }
+
+/* Add this new class to your Home.css file */
+.post-card-image {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+/* You can also add styles for the link excerpt */
+.post-excerpt-link {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 10px 0;
+  background-color: #f9f9f9;
+  font-size: 0.9em;
+}

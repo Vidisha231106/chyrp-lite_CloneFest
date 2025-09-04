@@ -35,7 +35,7 @@ const CreatePost = () => {
         form.append('title', title);
         form.append('status', status);
         form.append('file', photoFile);
-        await apiClient.post('/posts/photo', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+        await apiClient.post('/posts/photo-db', form, { headers: { 'Content-Type': 'multipart/form-data' } });
       } else if (feather === 'quote') {
         if (!quote.trim() || !attribution.trim()) {
           setError('Please enter both quote and attribution.');
@@ -74,11 +74,10 @@ const CreatePost = () => {
     } catch (err) {
       let detail = err?.response?.data?.detail;
       if (!detail && typeof err?.response?.data === 'object') {
-        try { detail = JSON.stringify(err.response.data); } catch {
-          if (!photoFile) {
-            setError('Please choose an image to upload.');
-            return;
-          }
+        try { 
+          detail = JSON.stringify(err.response.data); 
+        } catch {
+          detail = 'Unknown error occurred';
         }
       }
       setError(detail ? `Failed: ${detail}` : 'Failed to create post. Please try again.');
@@ -131,6 +130,11 @@ const CreatePost = () => {
           <div>
             <label>Choose image to upload:</label>
             <input type="file" accept="image/*" onChange={(e) => setPhotoFile(e.target.files?.[0] || null)} required />
+            {photoFile && (
+              <p style={{ marginTop: '10px', fontSize: '0.9em', color: '#666' }}>
+                Selected: {photoFile.name} ({(photoFile.size / 1024 / 1024).toFixed(2)} MB)
+              </p>
+            )}
           </div>
         ) : feather === 'quote' ? (
           <div>

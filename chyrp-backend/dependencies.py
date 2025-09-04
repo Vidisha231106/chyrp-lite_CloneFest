@@ -14,6 +14,18 @@ import models
 import schemas
 from database import SessionLocal
 
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from supabase import create_client, Client
+import os
+
+# Make sure the Supabase client is available here
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
 # --- Configuration ---
 load_dotenv()
 
@@ -48,33 +60,30 @@ def create_access_token(data: dict, expires_delta: Optional[datetime.timedelta] 
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(api_key_scheme), db: Session = Depends(get_db)):
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
-        token_type, token_value = token.split()
-        if token_type.lower() != "bearer":
-            raise ValueError("Invalid token type")
-    except (ValueError, AttributeError):
+        # Ask Supabase to validate the token and get the user
+        user_response = supabase.auth.get_user(token)
+        supabase_user = user_response.user
+        
+        if not supabase_user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+        # IMPORTANT: Find the corresponding user in your own public.users table
+        # This allows you to access their group, permissions, etc.
+        db_user = db.query(models.User).filter(models.User.email == supabase_user.email).first()
+        
+        if db_user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found in local database")
+        
+        return db_user
+
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token_value, SECRET_KEY, algorithms=[ALGORITHM])
-        login: str = payload.get("sub")
-        if login is None:
-            raise credentials_exception
-        token_data = schemas.TokenData(login=login)
-    except JWTError:
-        raise credentials_exception
-    user = db.query(models.User).filter(models.User.login == token_data.login).first()
-    if user is None:
-        raise credentials_exception
-    return user
 
 # --- NEW: Add the missing permission dependency function ---
 def require_permission(required_permissions: List[str]):
