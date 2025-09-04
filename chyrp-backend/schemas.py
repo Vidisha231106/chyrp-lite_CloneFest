@@ -1,10 +1,10 @@
 # schemas.py
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from typing import List, Optional
 import datetime
 
-# --- NEW: Pydantic Schemas for AI Enhancement ---
+# --- Pydantic Schemas for AI Enhancement ---
 class AIEnhanceRequest(BaseModel):
     text: str
     prompt: str = "Fix spelling and grammar, and improve the clarity and flow of the following text:"
@@ -12,8 +12,16 @@ class AIEnhanceRequest(BaseModel):
 class AIEnhanceResponse(BaseModel):
     enhanced_text: str
 
-# --- MOVED: Define PostOwner before it is used in PostModel ---
+# --- Define supporting schemas BEFORE they are used ---
+
 class PostOwner(BaseModel):
+    id: int
+    login: str
+    class Config:
+        from_attributes = True
+
+# --- NEW: Define UserLikeInfo here, BEFORE PostModel ---
+class UserLikeInfo(BaseModel):
     id: int
     login: str
     class Config:
@@ -44,13 +52,23 @@ class PostUpdate(BaseModel):
     status: Optional[str] = None
     pinned: Optional[bool] = None
 
+# --- MODIFIED: The PostModel now correctly handles likes ---
 class PostModel(PostBase):
     id: int
     created_at: datetime.datetime
     updated_at: datetime.datetime
-    owner: PostOwner # Now this works because PostOwner is defined above
+    owner: PostOwner
+    # Now this works because UserLikeInfo is defined above
+    liked_by_users: List[UserLikeInfo] = [] 
+
+    @computed_field
+    @property
+    def likes_count(self) -> int:
+        return len(self.liked_by_users)
+
     class Config:
         from_attributes = True
+
 
 # --- Pydantic Schemas for Groups ---
 
@@ -78,8 +96,8 @@ class UserCreate(UserBase):
 
 class UserModel(UserBase):
     id: int
+    is_active: bool
     joined_at: datetime.datetime
-    # --- REMOVED: 'posts' list to simplify and prevent circular dependencies ---
     group: Optional[GroupModel] = None
     class Config:
         from_attributes = True
@@ -88,4 +106,3 @@ class UserModel(UserBase):
 
 class TokenData(BaseModel):
     login: Optional[str] = None
-

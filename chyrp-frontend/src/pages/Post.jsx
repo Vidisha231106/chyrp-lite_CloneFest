@@ -16,15 +16,17 @@ const Post = () => {
   useEffect(() => {
     const fetchPostAndUser = async () => {
       try {
-        // Fetch the post
         const postResponse = await apiClient.get(`/posts/${postId}`);
         setPost(postResponse.data);
 
-        // Fetch the current user profile (will fail if not logged in)
+        // This will fail gracefully if the user is not logged in
         const userResponse = await apiClient.get('/users/me');
         setCurrentUser(userResponse.data);
-      } catch {
-        console.error("Error fetching data");
+      } catch (error) {
+        // If getting the user fails, we still have the post data
+        if (error.response?.status !== 401) {
+          console.error("Error fetching data:", error);
+        }
       } finally {
         setLoading(false);
       }
@@ -44,11 +46,16 @@ const Post = () => {
   };
 
   const handleLike = async () => {
-    try {
-      await apiClient.post(`/posts/${postId}/like`);
-      alert(`Toggled like for post ${postId}!`);
-    } catch {
+    if (!currentUser) {
       alert("You must be logged in to like a post.");
+      return;
+    }
+    try {
+      const response = await apiClient.post(`/posts/${postId}/like`);
+      setPost(response.data);
+    } catch (error) {
+      alert("Failed to update like status. You may not have permission.");
+      console.error(error);
     }
   };
 
@@ -65,6 +72,10 @@ const Post = () => {
     (currentUser.id === post.owner.id && currentUser.group.permissions.includes('delete_own_post'))
   );
 
+  const isLikedByCurrentUser = post.liked_by_users.some(
+    (user) => user.id === currentUser?.id
+  );
+
   return (
     <div className="post-page">
       <header className="post-header">
@@ -72,13 +83,13 @@ const Post = () => {
         <h1>{post.title || post.clean}</h1>
         <div className="post-meta">
           <span>By {post.owner.login}</span>
+          {/* --- THIS IS THE CORRECTED LINE --- */}
           <span>{new Date(post.created_at).toLocaleDateString()}</span>
           {canEdit && <Link to={`/edit-post/${post.id}`} className="btn-edit">Edit</Link>}
           {canDelete && <button onClick={handleDelete} className="btn-delete">Delete</button>}
         </div>
       </header>
       <div className="post-content">
-        {/* Enhanced content display for different post types */}
         {post.feather === 'photo' ? (
           <img
             src={post.body}
@@ -126,7 +137,16 @@ const Post = () => {
         )}
       </div>
       <footer className="post-footer">
-        <button onClick={handleLike} className="btn-like">❤️ Like</button>
+        <button 
+          onClick={handleLike} 
+          className={`btn-like ${isLikedByCurrentUser ? 'liked' : ''}`}
+          disabled={!currentUser}
+        >
+          ❤️ {isLikedByCurrentUser ? 'Liked' : 'Like'}
+        </button>
+        <span className="like-count">
+          {post.likes_count} {post.likes_count === 1 ? 'like' : 'likes'}
+        </span>
       </footer>
     </div>
   );

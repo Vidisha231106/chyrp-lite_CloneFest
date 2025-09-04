@@ -4,18 +4,23 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from dependencies import get_db, get_current_user, require_permission
 
-# --- Corrected Imports ---
-# Import models from the models.py file
 from models import User, Post
-# Import dependencies
-from dependencies import get_db, get_current_user
+import schemas
 
 router = APIRouter(
     tags=["Interactions"],
 )
 
-@router.post("/posts/{post_id}/like", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_permission(["like_post"]))])
-def toggle_post_like(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@router.post(
+    "/posts/{post_id}/like",
+    response_model=schemas.PostModel,
+    dependencies=[Depends(require_permission(["like_post"]))]
+)
+def toggle_post_like(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Toggles a like on a post for the current user."""
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
@@ -27,6 +32,8 @@ def toggle_post_like(post_id: int, db: Session = Depends(get_db), current_user: 
         post.liked_by_users.append(current_user)
         
     db.commit()
+    db.refresh(post)
+    return post
 
 @router.post("/posts/{post_id}/bookmark", status_code=status.HTTP_204_NO_CONTENT)
 def toggle_post_bookmark(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
