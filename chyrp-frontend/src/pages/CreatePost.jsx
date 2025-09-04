@@ -19,6 +19,29 @@ const CreatePost = () => {
   const [status, setStatus] = useState('draft'); // 'draft' or 'public'
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  
+  // --- NEW: State for AI processing ---
+  const [isEnhancing, setIsEnhancing] = useState(false);
+
+  // --- NEW: Handler for the AI button ---
+  const handleEnhanceWithAI = async () => {
+    if (!body.trim()) {
+      setError("Please write some text before enhancing with AI.");
+      return;
+    }
+    setError('');
+    setIsEnhancing(true);
+    try {
+      const response = await apiClient.post('/ai/enhance', { text: body });
+      setBody(response.data.enhanced_text); // Update the textarea with AI content
+    } catch (err) {
+      const detail = err?.response?.data?.detail || "Failed to enhance text. Please try again.";
+      setError(`AI Error: ${detail}`);
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -126,7 +149,18 @@ const CreatePost = () => {
 
         {/* Dynamic content based on feather type */}
         {feather === 'text' ? (
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your content..." rows="15" required />
+          // --- NEW: Added a wrapper and AI button ---
+          <div className="editor-wrapper">
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your content..." rows="15" required />
+            <button 
+              type="button" 
+              className="ai-enhance-btn" 
+              onClick={handleEnhanceWithAI} 
+              disabled={isEnhancing}
+            >
+              {isEnhancing ? 'Enhancing...' : '✨ Enhance with AI'}
+            </button>
+          </div>
         ) : feather === 'photo' ? (
           <div>
             <label>Choose image to upload:</label>
@@ -147,7 +181,7 @@ const CreatePost = () => {
         <div className="form-actions">
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="draft">Save as Draft</option>
-            <option value="public">Publish</option>
+            <option value="public">Publish/</option>
           </select>
           <button type="submit">Submit</button>
         </div>

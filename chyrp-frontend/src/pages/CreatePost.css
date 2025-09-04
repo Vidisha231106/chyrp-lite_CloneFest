@@ -149,3 +149,83 @@
     font-size: 0.8125rem;
   }
 }
+
+/* src/pages/CreatePost.css */
+
+.create-post-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 30px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ... existing styles ... */
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.form-actions select,
+.form-actions button {
+  padding: 10px 20px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 1em;
+}
+
+.form-actions button {
+  background-color: #007bff;
+  color: white;
+  border-color: #007bff;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.form-actions button:hover {
+  background-color: #0056b3;
+}
+
+/* --- NEW STYLES for AI feature --- */
+.editor-wrapper {
+  position: relative;
+}
+
+.ai-enhance-btn {
+  position: absolute;
+  bottom: 15px;
+  right: 15px;
+  padding: 8px 16px;
+  background-color: #6a0dad; /* A nice purple for AI */
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: bold;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  transition: all 0.2s ease-in-out;
+}
+
+.ai-enhance-btn:hover {
+  background-color: #8a2be2;
+  transform: translateY(-1px);
+}
+
+.ai-enhance-btn:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #d9534f;
+  background-color: #f2dede;
+  border: 1px solid #ebccd1;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
