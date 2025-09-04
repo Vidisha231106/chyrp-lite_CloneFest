@@ -11,6 +11,8 @@ from fastapi import UploadFile, File, Form
 import os
 from uuid import uuid4
 
+import google.generativeai as genai
+
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -43,6 +45,14 @@ app = FastAPI(
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+# --- NEW: Configure Google AI ---
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise Exception("Google API Key not found in .env file")
+genai.configure(api_key=GOOGLE_API_KEY)
+generation_config = genai.GenerationConfig(temperature=0.7)
+ai_model = genai.GenerativeModel('gemini-1.5-flash-latest', generation_config=generation_config)
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise Exception("Supabase credentials not found in .env file")
@@ -114,6 +124,35 @@ def create_initial_data():
 @app.get("/", tags=["Default"])
 def read_root():
     return {"message": "Welcome to the Chyrp Clone API!"}
+
+# --- NEW: AI Enhancement Endpoint ---
+@app.post("/ai/enhance", response_model=schemas.AIEnhanceResponse, tags=["AI"])
+async def enhance_text_with_ai(
+    request: schemas.AIEnhanceRequest,
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Enhances a given text using the Gemini Pro AI model.
+    """
+    try:
+        # Construct the full prompt for the AI
+        full_prompt = f"{request.prompt}\n\n---\n\n{request.text}"
+        
+        # Generate content using the AI model
+        response = ai_model.generate_content(full_prompt)
+        
+        # Check if the response contains text
+        if not response.parts:
+            raise HTTPException(status_code=500, detail="AI failed to generate a response.")
+            
+        enhanced_text = response.text
+        
+        return schemas.AIEnhanceResponse(enhanced_text=enhanced_text)
+
+    except Exception as e:
+        # Log the error for debugging
+        print(f"AI generation failed: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while communicating with the AI service.")
 
 # --- Authentication Endpoint ---
 @app.post("/token", tags=["Authentication"])

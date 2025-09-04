@@ -4,6 +4,14 @@ from pydantic import BaseModel
 from typing import List, Optional
 import datetime
 
+# --- NEW: Pydantic Schemas for AI Enhancement ---
+class AIEnhanceRequest(BaseModel):
+    text: str
+    prompt: str = "Fix spelling and grammar, and improve the clarity and flow of the following text:"
+
+class AIEnhanceResponse(BaseModel):
+    enhanced_text: str
+
 # --- MOVED: Define PostOwner before it is used in PostModel ---
 class PostOwner(BaseModel):
     id: int
