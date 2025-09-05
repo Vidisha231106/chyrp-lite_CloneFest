@@ -2,131 +2,126 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import apiClient from '../api';
 import './Post.css';
 
 const Post = () => {
   const [post, setPost] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { postId } = useParams();
+  const [error, setError] = useState('');
+  const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
-    const fetchPostAndUser = async () => {
+    const fetchPost = async () => {
       try {
-        const postResponse = await apiClient.get(`/posts/${postId}`);
-        setPost(postResponse.data);
-
-        // This will fail gracefully if the user is not logged in
-        const userResponse = await apiClient.get('/users/me');
-        setCurrentUser(userResponse.data);
-      } catch (error) {
-        // If getting the user fails, we still have the post data
-        if (error.response?.status !== 401) {
-          console.error("Error fetching data:", error);
-        }
+        const response = await apiClient.get(`/posts/${id}`);
+        setPost(response.data);
+      } catch (err) {
+        console.error('Failed to fetch post:', err);
+        setError('Could not load post. Please try again later.');
       } finally {
         setLoading(false);
       }
     };
-    fetchPostAndUser();
-  }, [postId]);
+
+    fetchPost();
+  }, [id]);
 
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this post?')) {
       try {
-        await apiClient.delete(`/posts/${postId}`);
+        await apiClient.delete(`/posts/${id}`);
         navigate('/');
-      } catch {
+      } catch (err) {
+        console.error('Failed to delete post:', err);
         alert('Failed to delete post. You may not have permission.');
       }
     }
   };
 
-  const handleLike = async () => {
-    if (!currentUser) {
-      alert("You must be logged in to like a post.");
-      return;
-    }
-    try {
-      const response = await apiClient.post(`/posts/${postId}/like`);
-      setPost(response.data);
-    } catch (error) {
-      alert("Failed to update like status. You may not have permission.");
-      console.error(error);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      </div>
+    );
+  }
 
-  if (loading) return <p>Loading...</p>;
-  if (!post) return <h1>Post not found</h1>;
+  if (error) {
+    return (
+      <div className="container text-red-400 text-center mt-12">
+        {error}
+      </div>
+    );
+  }
 
-  const canEdit = currentUser && (
-    currentUser.group.permissions.includes('edit_post') ||
-    (currentUser.id === post.owner.id && currentUser.group.permissions.includes('edit_own_post'))
-  );
-
-  const canDelete = currentUser && (
-    currentUser.group.permissions.includes('delete_post') ||
-    (currentUser.id === post.owner.id && currentUser.group.permissions.includes('delete_own_post'))
-  );
-
-  const isLikedByCurrentUser = post.liked_by_users.some(
-    (user) => user.id === currentUser?.id
-  );
+  if (!post) {
+    return (
+      <div className="container text-center mt-12">
+        <h1 className="text-2xl text-gray-300">Post not found</h1>
+      </div>
+    );
+  }
 
   return (
-    <div className="post-page">
-      <header className="post-header">
-        <Link to="/" className="back-link">← Back to Home</Link>
-        <h1>{post.title || post.clean}</h1>
-        <div className="post-meta">
-          <span>By {post.owner.login}</span>
-          {/* --- THIS IS THE CORRECTED LINE --- */}
+    <div className="post-page max-w-3xl mx-auto px-4 py-12 text-gray-200">
+      <header className="post-header mb-8">
+        <Link to="/" className="back-link text-primary-400 hover:underline">
+          ← Back to Home
+        </Link>
+        <h1 className="text-4xl font-bold mt-4">{post.title || post.clean}</h1>
+        <div className="post-meta text-sm text-gray-400 mt-2 flex items-center gap-4">
+          <span>By {post.owner?.login || 'unknown'}</span>
           <span>{new Date(post.created_at).toLocaleDateString()}</span>
-          {canEdit && <Link to={`/edit-post/${post.id}`} className="btn-edit">Edit</Link>}
-          {canDelete && <button onClick={handleDelete} className="btn-delete">Delete</button>}
+          {user && user.id === post.owner?.id && (
+            <div className="flex items-center gap-4">
+              <Link
+                to={`/edit/${post.id}`}
+                className="text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                Edit
+              </Link>
+              <button
+                onClick={handleDelete}
+                className="text-red-400 hover:text-red-300 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          )}
         </div>
       </header>
-      <div className="post-content">
-        {post.feather === 'photo' ? (
+
+      {/* Post content */}
+      <div className="post-content prose prose-invert max-w-none">
+        {post.feather === 'photo' && post.body?.startsWith('/uploads/') ? (
           <img
-            src={post.body}
+            src={`http://127.0.0.1:8000${post.body}`}
             alt={post.title || post.clean}
-            style={{ maxWidth: '100%', height: 'auto' }}
+            className="rounded-lg shadow-md"
           />
         ) : post.feather === 'quote' ? (
-          <blockquote style={{
-            borderLeft: '4px solid #007bff',
-            paddingLeft: '20px',
-            margin: '20px 0',
-            fontStyle: 'italic',
-            fontSize: '1.2em',
-            lineHeight: '1.6',
-            color: '#333'
-          }}>
+          <blockquote className="border-l-4 border-primary-500 pl-4 italic text-lg text-gray-300">
             <ReactMarkdown>{post.body || ''}</ReactMarkdown>
           </blockquote>
         ) : post.feather === 'link' ? (
-          <div style={{
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            padding: '20px',
-            margin: '20px 0',
-            backgroundColor: '#f9f9f9'
-          }}>
+          <div className="border border-gray-700 rounded-lg p-4 bg-gray-900/50">
             <ReactMarkdown
               components={{
                 a: ({ href, children }) => (
-                  <a href={href} target="_blank" rel="noopener noreferrer" style={{
-                    color: '#007bff',
-                    textDecoration: 'underline',
-                    fontWeight: 'bold'
-                  }}>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-300 underline font-semibold"
+                  >
                     {children} 🔗
                   </a>
-                )
+                ),
               }}
             >
               {post.body || ''}
@@ -136,18 +131,6 @@ const Post = () => {
           <ReactMarkdown>{post.body || ''}</ReactMarkdown>
         )}
       </div>
-      <footer className="post-footer">
-        <button 
-          onClick={handleLike} 
-          className={`btn-like ${isLikedByCurrentUser ? 'liked' : ''}`}
-          disabled={!currentUser}
-        >
-          ❤️ {isLikedByCurrentUser ? 'Liked' : 'Like'}
-        </button>
-        <span className="like-count">
-          {post.likes_count} {post.likes_count === 1 ? 'like' : 'likes'}
-        </span>
-      </footer>
     </div>
   );
 };

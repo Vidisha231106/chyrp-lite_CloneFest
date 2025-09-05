@@ -1,53 +1,27 @@
 // src/components/Layout.jsx
 
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import Header from './Header';
 import './Layout.css'; // We'll create this file next for styling
 
-const Layout = ({ children }) => {
-  const navigate = useNavigate();
-  const token = localStorage.getItem('token');
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    // Navigate and reload to ensure the navbar updates
-    navigate('/login');
-    window.location.reload(); 
-  };
+function Layout({ children }) {
+  useEffect(() => {
+    // Enable smooth scrolling
+    document.documentElement.style.scrollBehavior = 'smooth';
+    // Set dark mode by default
+    document.documentElement.classList.add('dark');
+  }, []);
 
   return (
-    <div className="app-layout">
-      <header className="app-header">
-        <div className="container">
-          <Link to="/" className="logo">My Awesome Site</Link>
-          <nav className="main-nav">
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-            <Link to="/contact">Contact</Link>
-            {token ? (
-              <>
-                <Link to="/create-post">Create Post</Link>
-                <button onClick={handleLogout} className="nav-button">Logout</button>
-              </>
-            ) : (
-              <Link to="/login">Login</Link>
-            )}
-          </nav>
-        </div>
-      </header>
-
-      <main className="main-content">
-        <div className="container">
+    <div className="min-h-screen bg-gradient-to-b from-dark-bg to-dark-card text-gray-100 antialiased">
+      <Header />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20">
+        <main className="prose prose-invert prose-purple max-w-none">
           {children}
-        </div>
-      </main>
-
-      <footer className="app-footer">
-        <div className="container">
-          <p>&copy; 2025 My Awesome Site. All rights reserved.</p>
-        </div>
-      </footer>
+        </main>
+      </div>
     </div>
   );
-};
+}
 
 export default Layout;
