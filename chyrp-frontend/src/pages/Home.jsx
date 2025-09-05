@@ -1,132 +1,170 @@
 // src/pages/Home.jsx
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../api';
-import './Home.css';
 
-const Home = () => {
+export default function Home() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // This function fetches posts from the backend when the component loads
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const response = await apiClient.get('/posts/?content_type=post');
-        setPosts(response.data);
-      } catch (error) {
-        console.error("Failed to fetch posts:", error);
+        const res = await apiClient.get('/posts/?content_type=post');
+        setPosts(res.data || []);
+      } catch (err) {
+        console.error('Failed to fetch posts:', err);
         setError('Could not load posts. Please try again later.');
       } finally {
         setLoading(false);
       }
     };
-    fetchPosts();
-  }, []); // The empty array ensures this runs only once
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+    fetchPosts();
+  }, []);
+
+  const formatDate = (s) => new Date(s).toLocaleDateString();
 
   if (loading) {
-    return <div className="container"><p>Loading posts...</p></div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-transparent">
+        <div className="text-gray-400 animate-pulse">Loading posts…</div>
+      </div>
+    );
   }
+
   if (error) {
-    return <div className="container"><p style={{ color: 'red' }}>{error}</p></div>;
+    return (
+      <div className="container">
+        <p style={{ color: 'red' }}>{error}</p>
+      </div>
+    );
   }
 
   return (
-    <div className="home">
-      <div className="container">
-        <section className="hero">
-          <h1>Welcome to My Awesome Site</h1>
-          <p className="hero-subtitle">
-            Discover insights, tutorials, and stories from the world of technology and development.
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-black">
+      <div className="max-w-3xl mx-auto px-4 py-12">
+        {/* Hero */}
+        <section className="text-center mb-12">
+          <h1 className="text-5xl md:text-6xl font-extrabold glow-heading animate-hue-spin">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-600">
+              Chyrp Modern
+            </span>
+          </h1>
+          <p className="mt-4 text-gray-400 max-w-2xl mx-auto">
+            A Modern Blogging Website
           </p>
+          <div className="mt-6 flex justify-center gap-4">
+            <Link to="/create-post" className="btn-primary">Create Post</Link>
+            <Link to="/about" className="btn-ghost">Learn more</Link>
+          </div>
         </section>
 
-        <section className="latest-posts">
-          <h2>Latest Posts</h2>
-          <div className="posts-grid">
-            {posts.length > 0 ? (
-              posts.map(post => (
-                <article key={post.id} className="post-card">
-                  <div className="post-content">
-                    <h3 className="post-title">
-                      <Link to={`/posts/${post.id}`}>{post.title || post.clean}</Link>
-                    </h3>
-                    {/* Enhanced content display for different post types */}
-                    {post.feather === 'photo' ? (
-                      <Link to={`/posts/${post.id}`}>
-                        <img
-                          src={post.body}
-                          alt={post.title || post.clean}
-                          style={{
-                            width: '100%',
-                            height: '220px',
-                            objectFit: 'cover',
-                            borderRadius: '8px'
-                          }}
-                        />
-                      </Link>
-                    ) : post.feather === 'link' ? (
-                      <div style={{
-                        border: '1px solid #ddd',
-                        borderRadius: '6px',
-                        padding: '12px',
-                        margin: '10px 0',
-                        backgroundColor: '#f9f9f9',
-                        fontSize: '0.9em'
-                      }}>
-                        <strong>🔗 Link Post</strong><br />
-                        {(() => {
-                          // Extract URL from the post body
-                          const urlMatch = post.body?.match(/https?:\/\/[^\s]+/);
-                          const url = urlMatch ? urlMatch[0] : null;
-                          return url ? (
-                            <a href={url} target="_blank" rel="noopener noreferrer" style={{
-                              color: '#007bff',
-                              textDecoration: 'underline',
-                              fontWeight: 'bold'
-                            }}>
-                              {post.title || 'Shared Link'} 🔗
-                            </a>
-                          ) : (
-                            post.title || 'Shared Link'
-                          );
-                        })()}
-                      </div>
-                    ) : (
-                      <p className="post-excerpt">
-                        {post.body ? `${post.body.substring(0, 150)}...` : 'This is a feather post.'}
-                      </p>
-                    )}
-                    <div className="post-meta">
-                      <span className="post-author">By {post.owner.login}</span>
-                      <span className="post-date">{formatDate(post.created_at)}</span>
-                      {/* --- Likes display --- */}
-                      <span className="like-display">❤️ {post.likes_count}</span>
-                    </div>
-                    <Link to={`/posts/${post.id}`} className="read-more">
-                      Read More →
+        {/* Latest Posts */}
+        <section className="space-y-8">
+          {posts.length === 0 && (
+            <div className="muted">No posts yet.</div>
+          )}
+
+          {posts.map(post => (
+            <article
+              key={post.id}
+              className="card-glass hover:shadow-glow-lg transition-shadow duration-300"
+            >
+              <div className="flex flex-col gap-4">
+                {/* Photo post */}
+                {post.feather === 'photo' && post.body?.startsWith('/uploads/') && (
+                  <Link
+                    to={`/posts/${post.id}`}
+                    className="block overflow-hidden rounded-xl"
+                  >
+                    <img
+                      src={`http://127.0.0.1:8000${post.body}`}
+                      alt={post.title || post.clean}
+                      className="w-full h-72 object-cover transform transition duration-300 hover:scale-105"
+                    />
+                  </Link>
+                )}
+
+                {/* Link post */}
+                {post.feather === 'link' && (
+                  <div className="border border-gray-700 rounded-lg p-4 bg-gray-900/50">
+                    <strong>🔗 Link Post</strong>
+                    <br />
+                    {(() => {
+                      const urlMatch = post.body?.match(/https?:\/\/[^\s]+/);
+                      const url = urlMatch ? urlMatch[0] : null;
+                      return url ? (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-300 underline font-semibold"
+                        >
+                          {post.title || 'Shared Link'} 🔗
+                        </a>
+                      ) : (
+                        post.title || 'Shared Link'
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Regular text post */}
+                {post.feather !== 'photo' && post.feather !== 'link' && (
+                  <p className="text-gray-400 mt-2">
+                    {post.body
+                      ? `${post.body.slice(0, 180)}${
+                          post.body.length > 180 ? '...' : ''
+                        }`
+                      : '—'}
+                  </p>
+                )}
+
+                {/* Post content */}
+                <div>
+                  <h3 className="text-2xl font-semibold">
+                    <Link
+                      to={`/posts/${post.id}`}
+                      className="hover:text-primary-300"
+                    >
+                      {post.title || post.clean}
+                    </Link>
+                  </h3>
+
+                  <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
+                    <div>By {post.owner?.login || 'unknown'}</div>
+                    <div>{formatDate(post.created_at)}</div>
+                  </div>
+
+                  <div className="mt-4 flex items-center gap-3">
+                    <button className="px-3 py-2 rounded-lg bg-primary-600/20 text-primary-200 hover:bg-primary-600/40 transition">
+                      ❤️ {post.likes_count || 0}
+                    </button>
+                    <Link
+                      to={`/posts/${post.id}`}
+                      className="text-primary-300 hover:underline"
+                    >
+                      Read more →
                     </Link>
                   </div>
-                </article>
-              ))
-            ) : (
-              <p>No posts have been published yet.</p>
-            )}
+                </div>
+              </div>
+            </article>
+          ))}
+
+          {/* Floating new-post CTA */}
+          <div className="fixed bottom-8 right-8">
+            <Link
+              to="/create-post"
+              className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 shadow-glow-lg text-white text-2xl hover:scale-105 transition-transform"
+            >
+              +
+            </Link>
           </div>
         </section>
       </div>
     </div>
   );
-};
-
-export default Home;
+}

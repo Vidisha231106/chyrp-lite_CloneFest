@@ -1,117 +1,79 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import './Header.css';
 
 const Header = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      // In a real app, this would search through posts
-      console.log('Searching for:', searchQuery);
-    }
-  };
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
-  const isActive = (path) => location.pathname === path;
-
   return (
-    <header className="header">
-      <div className="container">
-        <div className="header-content">
-          <Link to="/" className="logo">
-            My Awesome Site
+    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      isScrolled ? 'bg-slate-900/95 backdrop-blur-md shadow-lg shadow-purple-900/10' : 'bg-transparent'
+    }`}>
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          <Link 
+            to="/" 
+            className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-purple-600 
+                       bg-clip-text text-transparent hover:from-purple-500 hover:to-purple-700 
+                       transition-all duration-300"
+          >
+            ChyrpLite
           </Link>
-
-          <form className="search-form" onSubmit={handleSearch}>
-            <input
-              type="text"
-              placeholder="Search posts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="search-input"
-            />
-            <button type="submit" className="search-btn">
-              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </button>
-          </form>
-
-          <nav className={`nav ${isMenuOpen ? 'nav-open' : ''}`}>
-            <Link 
-              to="/" 
-              className={`nav-link ${isActive('/') ? 'active' : ''}`}
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Blog
+          
+          <div className="hidden md:flex items-center gap-8">
+            <Link to="/" className={`nav-link ${location.pathname === '/' ? 'text-purple-400 after:w-full' : ''}`}>
+              Home
             </Link>
-            <Link 
-              to="/about" 
-              className={`nav-link ${isActive('/about') ? 'active' : ''}`}
-              onClick={() => setIsMenuOpen(false)}
-            >
+            <Link to="/about" className={`nav-link ${location.pathname === '/about' ? 'text-purple-400 after:w-full' : ''}`}>
               About
             </Link>
-            <Link 
-              to="/contact" 
-              className={`nav-link ${isActive('/contact') ? 'active' : ''}`}
-              onClick={() => setIsMenuOpen(false)}
-            >
+            <Link to="/contact" className={`nav-link ${location.pathname === '/contact' ? 'text-purple-400 after:w-full' : ''}`}>
               Contact
             </Link>
-            
             {user ? (
               <>
-                <Link 
-                  to="/create-post" 
-                  className={`nav-link ${isActive('/create-post') ? 'active' : ''}`}
-                  onClick={() => setIsMenuOpen(false)}
-                >
+                <Link to="/create-post" className="btn btn-secondary">
                   Create Post
                 </Link>
                 <button 
-                  onClick={() => {
-                    handleLogout();
-                    setIsMenuOpen(false);
-                  }}
-                  className="nav-link btn-ghost"
+                  onClick={handleLogout}
+                  className="text-gray-300 hover:text-purple-400 transition-colors"
                 >
                   Logout
                 </button>
               </>
             ) : (
-              <Link 
-                to="/login" 
-                className={`nav-link ${isActive('/login') ? 'active' : ''}`}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Log in
+              <Link to="/login" className="btn">
+                Login
               </Link>
             )}
-          </nav>
+          </div>
 
-          <button 
-            className="menu-toggle"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            <span></span>
-            <span></span>
-            <span></span>
+          {/* Mobile Menu Button */}
+          <button className="md:hidden p-2 rounded-lg hover:bg-purple-500/10">
+            <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
           </button>
         </div>
-      </div>
+      </nav>
     </header>
   );
 };
