@@ -12,7 +12,7 @@ from fastapi import UploadFile, File, Form
 import os
 from uuid import uuid4
 
-import google.generativeai as genai
+# import google.generativeai as genai  # Temporarily commented out for testing
 
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,7 +33,9 @@ from dependencies import (
     get_optional_current_user,
     require_post_permission  # <-- EXISTING IMPORT
 )
-from routers import interactions
+from routers import interactions, comments, tags, categories, views, maptcha, highlighter, lightbox, cascade, embed, mentionable, mathjax
+from cache import setup_cache, cache_for_5_minutes, cache_for_1_hour
+from utils import generate_excerpt
 
 # ===============================================================================
 # 1. FASTAPI APP INITIALIZATION & MIDDLEWARE
@@ -45,16 +47,18 @@ app = FastAPI(
 )
 
 load_dotenv()
+# Supabase configuration for both database and storage
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SITE_BASE_URL = os.getenv("SITE_BASE_URL", "http://localhost:5173")
 
 # --- NEW: Configure Google AI ---
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-if not GOOGLE_API_KEY:
-    raise Exception("Google API Key not found in .env file")
-genai.configure(api_key=GOOGLE_API_KEY)
-generation_config = genai.GenerationConfig(temperature=0.7)
-ai_model = genai.GenerativeModel('gemini-1.5-flash-latest', generation_config=generation_config)
+# GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# if not GOOGLE_API_KEY:
+#     raise Exception("Google API Key not found in .env file")
+# genai.configure(api_key=GOOGLE_API_KEY)
+# generation_config = genai.GenerationConfig(temperature=0.7)
+# ai_model = genai.GenerativeModel('gemini-1.5-flash-latest', generation_config=generation_config)
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise Exception("Supabase credentials not found in .env file")
@@ -77,9 +81,23 @@ app.add_middleware(
 
 # --- Include Routers from other files ---
 app.include_router(interactions.router)
+app.include_router(comments.router)
+app.include_router(tags.router)
+app.include_router(categories.router)
+app.include_router(views.router)
+app.include_router(maptcha.router)
+app.include_router(highlighter.router)
+app.include_router(lightbox.router)
+app.include_router(cascade.router)
+app.include_router(embed.router)
+app.include_router(mentionable.router)
+app.include_router(mathjax.router)
 
 # --- Create Database Tables on Startup ---
 models.Base.metadata.create_all(bind=engine)
+
+# --- Setup Cache ---
+setup_cache()
 
 # ===============================================================================
 # 2. STARTUP EVENT (DATABASE SEEDING)
@@ -128,33 +146,33 @@ def read_root():
     return {"message": "Welcome to the Chyrp Clone API!"}
 
 # --- NEW: AI Enhancement Endpoint ---
-@app.post("/ai/enhance", response_model=schemas.AIEnhanceResponse, tags=["AI"])
-async def enhance_text_with_ai(
-    request: schemas.AIEnhanceRequest,
-    current_user: models.User = Depends(get_current_user)
-):
-    """
-    Enhances a given text using the Gemini Pro AI model.
-    """
-    try:
-        # Construct the full prompt for the AI
-        full_prompt = f"{request.prompt}\n\n---\n\n{request.text}"
-        
-        # Generate content using the AI model
-        response = ai_model.generate_content(full_prompt)
-        
-        # Check if the response contains text
-        if not response.parts:
-            raise HTTPException(status_code=500, detail="AI failed to generate a response.")
-            
-        enhanced_text = response.text
-        
-        return schemas.AIEnhanceResponse(enhanced_text=enhanced_text)
-
-    except Exception as e:
-        # Log the error for debugging
-        print(f"AI generation failed: {e}")
-        raise HTTPException(status_code=500, detail="An error occurred while communicating with the AI service.")
+# @app.post("/ai/enhance", response_model=schemas.AIEnhanceResponse, tags=["AI"])
+# async def enhance_text_with_ai(
+#     request: schemas.AIEnhanceRequest,
+#     current_user: models.User = Depends(get_current_user)
+# ):
+#     """
+#     Enhances a given text using the Gemini Pro AI model.
+#     """
+#     try:
+#         # Construct the full prompt for the AI
+#         full_prompt = f"{request.prompt}\n\n---\n\n{request.text}"
+#         
+#         # Generate content using the AI model
+#         response = ai_model.generate_content(full_prompt)
+#         
+#         # Check if the response contains text
+#         if not response.parts:
+#             raise HTTPException(status_code=500, detail="AI failed to generate a response.")
+#             
+#         enhanced_text = response.text
+#         
+#         return schemas.AIEnhanceResponse(enhanced_text=enhanced_text)
+# 
+#     except Exception as e:
+#         # Log the error for debugging
+#         print(f"AI generation failed: {e}")
+#         raise HTTPException(status_code=500, detail="An error occurred while communicating with the AI service.")
 
 # --- Authentication Endpoint ---
 @app.post("/token", tags=["Authentication"])
@@ -191,6 +209,14 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 async def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
+# Test endpoint to check authentication
+@app.get("/test-auth", tags=["Test"])
+async def test_auth(current_user: Optional[models.User] = Depends(get_optional_current_user)):
+    if current_user:
+        return {"message": f"Hello {current_user.login}!", "authenticated": True}
+    else:
+        return {"message": "Not authenticated", "authenticated": False}
+
 # --- Groups Endpoints ---
 @app.post("/groups/", response_model=schemas.GroupModel, tags=["Groups"])
 def create_group(group: schemas.GroupCreate, db: Session = Depends(get_db)):
@@ -217,15 +243,41 @@ def create_post(
     existing = db.query(models.Post).filter(models.Post.clean == post.clean).first()
     if existing:
         raise HTTPException(status_code=400, detail="A post with this slug already exists.")
-        
-    db_post = models.Post(**post.dict(), user_id=current_user.id)
+    
+    # Extract tag_ids and category_ids and remove from post data
+    post_data = post.dict()
+    tag_ids = post_data.pop('tag_ids', [])
+    category_ids = post_data.pop('category_ids', [])
+    
+    # Auto-generate excerpt if not provided
+    if not post_data.get('excerpt') and post_data.get('body'):
+        post_data['excerpt'] = generate_excerpt(post_data['body'])
+    
+    # Create post
+    db_post = models.Post(**post_data, user_id=current_user.id)
     db.add(db_post)
     db.commit()
     db.refresh(db_post)
+    
+    # Add tags if provided
+    if tag_ids:
+        tags = db.query(models.Tag).filter(models.Tag.id.in_(tag_ids)).all()
+        db_post.tags.extend(tags)
+    
+    # Add categories if provided
+    if category_ids:
+        categories = db.query(models.Category).filter(models.Category.id.in_(category_ids)).all()
+        db_post.categories.extend(categories)
+    
+    if tag_ids or category_ids:
+        db.commit()
+        db.refresh(db_post)
+    
     return db_post
 
 # --- MODIFIED: Update the read_posts endpoint ---
 @app.get("/posts/", response_model=List[schemas.PostModel], tags=["Posts"])
+@cache_for_5_minutes()
 def read_posts(
     content_type: Optional[str] = None, 
     skip: int = 0, 
@@ -258,6 +310,7 @@ def read_posts(
     return posts
 
 @app.get("/posts/{post_id}", response_model=schemas.PostModel, tags=["Posts"])
+@cache_for_5_minutes()
 def read_post(post_id: int, db: Session = Depends(get_db)):
     db_post = db.query(models.Post).filter(models.Post.id == post_id).first()
     if db_post is None:
@@ -446,3 +499,173 @@ async def create_link_post(
     db.commit()
     db.refresh(db_post)
     return db_post
+
+@app.post("/posts/video", response_model=schemas.PostModel, tags=["Posts"])
+async def create_video_post(
+    clean: str = Form(...),
+    title: Optional[str] = Form(None),
+    status: str = Form("public"),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Create a video post by uploading a video file."""
+    # Prevent duplicate slug
+    existing = db.query(models.Post).filter(models.Post.clean == clean).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="A post with this slug already exists.")
+
+    # Validate file type
+    video_extensions = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv']
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    
+    if not (file.content_type and file.content_type.startswith('video/')) and file_ext not in video_extensions:
+        raise HTTPException(status_code=400, detail="File must be a video")
+
+    # Upload to Supabase
+    ext = os.path.splitext(file.filename)[1]
+    unique_name = f"{uuid4().hex}{ext}"
+
+    try:
+        contents = await file.read()
+        supabase.storage.from_(BUCKET_NAME).upload(
+            path=unique_name,
+            file=contents,
+            file_options={"content-type": file.content_type}
+        )
+        file_url = supabase.storage.from_(BUCKET_NAME).get_public_url(unique_name)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
+    
+    finally:
+        await file.close()
+
+    # Create a post with feather 'video'
+    db_post = models.Post(
+        content_type="post",
+        feather="video",
+        title=title,
+        body=file_url,
+        clean=clean,
+        status=status,
+        user_id=current_user.id,
+    )
+    db.add(db_post)
+    db.commit()
+    db.refresh(db_post)
+    return db_post
+
+@app.post("/posts/audio", response_model=schemas.PostModel, tags=["Posts"])
+async def create_audio_post(
+    clean: str = Form(...),
+    title: Optional[str] = Form(None),
+    status: str = Form("public"),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Create an audio post by uploading an audio file."""
+    # Prevent duplicate slug
+    existing = db.query(models.Post).filter(models.Post.clean == clean).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="A post with this slug already exists.")
+
+    # Validate file type
+    audio_extensions = ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma']
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    
+    if not (file.content_type and file.content_type.startswith('audio/')) and file_ext not in audio_extensions:
+        raise HTTPException(status_code=400, detail="File must be an audio file")
+
+    # Upload to Supabase
+    ext = os.path.splitext(file.filename)[1]
+    unique_name = f"{uuid4().hex}{ext}"
+
+    try:
+        contents = await file.read()
+        supabase.storage.from_(BUCKET_NAME).upload(
+            path=unique_name,
+            file=contents,
+            file_options={"content-type": file.content_type}
+        )
+        file_url = supabase.storage.from_(BUCKET_NAME).get_public_url(unique_name)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
+    
+    finally:
+        await file.close()
+
+    # Create a post with feather 'audio'
+    db_post = models.Post(
+        content_type="post",
+        feather="audio",
+        title=title,
+        body=file_url,
+        clean=clean,
+        status=status,
+        user_id=current_user.id,
+    )
+    db.add(db_post)
+    db.commit()
+    db.refresh(db_post)
+    return db_post
+
+@app.post("/uploads/multi", tags=["Uploads"])
+async def upload_multiple_files(
+    files: List[UploadFile] = File(...),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Upload multiple files to Supabase Storage and return their public URLs."""
+    urls = []
+    for file in files:
+        ext = os.path.splitext(file.filename)[1]
+        unique_name = f"{uuid4().hex}{ext}"
+        try:
+            contents = await file.read()
+            supabase.storage.from_(BUCKET_NAME).upload(
+                path=unique_name,
+                file=contents,
+                file_options={"content-type": file.content_type}
+            )
+            file_url = supabase.storage.from_(BUCKET_NAME).get_public_url(unique_name)
+            urls.append({"url": file_url, "filename": file.filename})
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error uploading {file.filename}: {str(e)}")
+        finally:
+            await file.close()
+    return {"files": urls}
+
+@app.get("/sitemap.xml", tags=["SEO"]) 
+def sitemap(db: Session = Depends(get_db)):
+    """Generate a simple sitemap for public posts and pages."""
+    posts = db.query(models.Post).filter(models.Post.status == 'public').order_by(models.Post.updated_at.desc()).all()
+
+    url_items = []
+    generated_at = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+    for post in posts:
+        # Prefer clean slug if available; fall back to id route
+        path = f"/post/{post.id}"
+        if post.clean:
+            # Example frontend route assumption: /p/{clean}
+            path = f"/p/{post.clean}"
+        url_items.append(f"""
+  <url>
+    <loc>{SITE_BASE_URL}{path}</loc>
+    <lastmod>{post.updated_at.strftime('%Y-%m-%d')}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>{'1.0' if post.pinned else '0.5'}</priority>
+  </url>""")
+
+    xml = f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"> 
+  <url>
+    <loc>{SITE_BASE_URL}</loc>
+    <lastmod>{generated_at}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>{''.join(url_items)}
+</urlset>"""
+
+    return Response(content=xml.strip(), media_type="application/xml")

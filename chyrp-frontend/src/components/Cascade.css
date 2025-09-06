@@ -1,0 +1,167 @@
+/* src/components/Cascade.css */
+
+.cascade-container {
+  width: 100%;
+}
+
+.cascade-item {
+  margin-bottom: 1.5rem;
+}
+
+.cascade-item-default {
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  font-family: monospace;
+  font-size: 0.875rem;
+  overflow-x: auto;
+}
+
+.cascade-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+
+.cascade-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e9ecef;
+  border-top: 2px solid #2563eb;
+  border-radius: 50%;
+  animation: cascade-spin 1s linear infinite;
+}
+
+@keyframes cascade-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.cascade-error {
+  text-align: center;
+  padding: 2rem;
+  color: #dc2626;
+}
+
+.cascade-error p {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+}
+
+.cascade-retry-btn {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.cascade-retry-btn:hover {
+  background: #b91c1c;
+}
+
+.cascade-end {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+  font-size: 0.875rem;
+  border-top: 1px solid #e9ecef;
+  margin-top: 2rem;
+}
+
+.cascade-end p {
+  margin: 0;
+  font-style: italic;
+}
+
+.cascade-empty {
+  text-align: center;
+  padding: 3rem;
+  color: #6c757d;
+}
+
+.cascade-empty p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .cascade-item {
+    margin-bottom: 1rem;
+  }
+  
+  .cascade-loading,
+  .cascade-error,
+  .cascade-end {
+    padding: 1.5rem;
+  }
+  
+  .cascade-empty {
+    padding: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .cascade-loading,
+  .cascade-error,
+  .cascade-end {
+    padding: 1rem;
+  }
+  
+  .cascade-empty {
+    padding: 1.5rem;
+  }
+  
+  .cascade-retry-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8125rem;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .cascade-item-default {
+    background: #343a40;
+    border-color: #495057;
+    color: #e9ecef;
+  }
+  
+  .cascade-loading {
+    color: #adb5bd;
+  }
+  
+  .cascade-spinner {
+    border-color: #495057;
+    border-top-color: #79c0ff;
+  }
+  
+  .cascade-error {
+    color: #f87171;
+  }
+  
+  .cascade-retry-btn {
+    background: #dc2626;
+  }
+  
+  .cascade-retry-btn:hover {
+    background: #b91c1c;
+  }
+  
+  .cascade-end {
+    color: #adb5bd;
+    border-top-color: #495057;
+  }
+  
+  .cascade-empty {
+    color: #adb5bd;
+  }
+}

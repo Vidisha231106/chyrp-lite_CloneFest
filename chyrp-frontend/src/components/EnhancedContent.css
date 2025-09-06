@@ -1,0 +1,60 @@
+/* src/components/EnhancedContent.css */
+
+.content-processing {
+  padding: 1rem;
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Math styling */
+.math-inline {
+  display: inline;
+}
+
+.math-display {
+  display: block;
+  text-align: center;
+  margin: 1.5rem 0;
+}
+
+.math-latex {
+  display: block;
+  text-align: center;
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .math-display,
+  .math-latex {
+    margin: 1rem 0;
+  }
+  
+  .math-latex {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .math-display,
+  .math-latex {
+    margin: 0.75rem 0;
+  }
+  
+  .math-latex {
+    padding: 0.5rem;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .math-latex {
+    background: #343a40;
+    border-color: #495057;
+  }
+}

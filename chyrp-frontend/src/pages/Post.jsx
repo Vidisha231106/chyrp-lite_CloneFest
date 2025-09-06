@@ -4,12 +4,17 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import apiClient from '../api';
+import Comments from '../components/Comments';
+import EnhancedContent from '../components/EnhancedContent';
+import Lightbox from '../components/Lightbox';
+import EmbedPreview from '../components/EmbedPreview';
 import './Post.css';
 
 const Post = () => {
   const [post, setPost] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const { postId } = useParams();
   const navigate = useNavigate();
 
@@ -88,13 +93,41 @@ const Post = () => {
           {canEdit && <Link to={`/edit-post/${post.id}`} className="btn-edit">Edit</Link>}
           {canDelete && <button onClick={handleDelete} className="btn-delete">Delete</button>}
         </div>
+        
+        {/* Tags and Categories */}
+        {(post.tags && post.tags.length > 0) || (post.categories && post.categories.length > 0) ? (
+          <div className="post-taxonomy">
+            {post.tags && post.tags.length > 0 && (
+              <div className="post-tags">
+                <span className="taxonomy-label">Tags:</span>
+                {post.tags.map(tag => (
+                  <span key={tag.id} className="tag" style={{ backgroundColor: tag.color }}>
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            )}
+            {post.categories && post.categories.length > 0 && (
+              <div className="post-categories">
+                <span className="taxonomy-label">Categories:</span>
+                {post.categories.map(category => (
+                  <span key={category.id} className="category" style={{ backgroundColor: category.color }}>
+                    {category.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
       </header>
       <div className="post-content">
         {post.feather === 'photo' ? (
           <img
             src={post.body}
             alt={post.title || post.clean}
-            style={{ maxWidth: '100%', height: 'auto' }}
+            style={{ maxWidth: '100%', height: 'auto', cursor: 'pointer' }}
+            onClick={() => setLightboxOpen(true)}
+            className="post-image"
           />
         ) : post.feather === 'quote' ? (
           <blockquote style={{
@@ -108,32 +141,83 @@ const Post = () => {
           }}>
             <ReactMarkdown>{post.body || ''}</ReactMarkdown>
           </blockquote>
-        ) : post.feather === 'link' ? (
-          <div style={{
+        ) : post.feather === 'video' ? (
+          <div className="video-container" style={{
             border: '1px solid #ddd',
             borderRadius: '8px',
             padding: '20px',
             margin: '20px 0',
             backgroundColor: '#f9f9f9'
           }}>
-            <ReactMarkdown
-              components={{
-                a: ({ href, children }) => (
-                  <a href={href} target="_blank" rel="noopener noreferrer" style={{
-                    color: '#007bff',
-                    textDecoration: 'underline',
-                    fontWeight: 'bold'
-                  }}>
-                    {children} 🔗
-                  </a>
-                )
+            <video
+              controls
+              style={{
+                width: '100%',
+                maxWidth: '800px',
+                height: 'auto',
+                borderRadius: '4px'
               }}
             >
-              {post.body || ''}
-            </ReactMarkdown>
+              <source src={post.body} type="video/mp4" />
+              <source src={post.body} type="video/webm" />
+              <source src={post.body} type="video/ogg" />
+              Your browser does not support the video tag.
+            </video>
+            {post.title && <p style={{ marginTop: '10px', fontStyle: 'italic' }}>{post.title}</p>}
+          </div>
+        ) : post.feather === 'audio' ? (
+          <div className="audio-container" style={{
+            border: '1px solid #ddd',
+            borderRadius: '8px',
+            padding: '20px',
+            margin: '20px 0',
+            backgroundColor: '#f9f9f9'
+          }}>
+            <audio
+              controls
+              style={{
+                width: '100%',
+                maxWidth: '600px'
+              }}
+            >
+              <source src={post.body} type="audio/mpeg" />
+              <source src={post.body} type="audio/wav" />
+              <source src={post.body} type="audio/ogg" />
+              Your browser does not support the audio tag.
+            </audio>
+            {post.title && <p style={{ marginTop: '10px', fontStyle: 'italic' }}>{post.title}</p>}
+          </div>
+        ) : post.feather === 'link' ? (
+          <div>
+            <EmbedPreview url={post.body} content={post.body} />
+            {post.title && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '1rem',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '8px',
+                border: '1px solid #e9ecef'
+              }}>
+                <ReactMarkdown
+                  components={{
+                    a: ({ href, children }) => (
+                      <a href={href} target="_blank" rel="noopener noreferrer" style={{
+                        color: '#007bff',
+                        textDecoration: 'underline',
+                        fontWeight: 'bold'
+                      }}>
+                        {children} 🔗
+                      </a>
+                    )
+                  }}
+                >
+                  {post.title}
+                </ReactMarkdown>
+              </div>
+            )}
           </div>
         ) : (
-          <ReactMarkdown>{post.body || ''}</ReactMarkdown>
+          <EnhancedContent content={post.body || ''} />
         )}
       </div>
       <footer className="post-footer">
@@ -147,7 +231,21 @@ const Post = () => {
         <span className="like-count">
           {post.likes_count} {post.likes_count === 1 ? 'like' : 'likes'}
         </span>
+        <span className="view-count">
+          👁️ {post.view_count || 0} {post.view_count === 1 ? 'view' : 'views'}
+        </span>
       </footer>
+
+      {/* Comments Section */}
+      <Comments postId={post.id} currentUser={currentUser} />
+
+      {/* Lightbox */}
+      <Lightbox
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        postId={post.id}
+        images={post.feather === 'photo' ? [{ url: post.body, alt: post.title || post.clean }] : []}
+      />
     </div>
   );
 };

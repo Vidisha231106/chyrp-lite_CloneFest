@@ -237,7 +237,54 @@
 }
 
 /* --- STYLE FOR THE NEW LIKE COUNT --- */
-.like-display {
+.like-display,
+.view-display {
   display: inline-flex;
   align-items: center;
+  gap: 0.25rem;
+}
+
+/* Tags and Categories for Home page */
+.post-taxonomy {
+  margin: 0.75rem 0;
+}
+
+.post-tags,
+.post-categories {
+  margin-bottom: 0.5rem;
+}
+
+.post-tags:last-child,
+.post-categories:last-child {
+  margin-bottom: 0;
+}
+
+.tag,
+.category {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  margin: 0.2rem 0.4rem 0.2rem 0;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: white;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.tag:hover,
+.category:hover {
+  opacity: 0.8;
+}
+
+.more-tags {
+  color: var(--text-light);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+/* Cascade specific styles */
+.posts-cascade {
+  max-width: 800px;
+  margin: 0 auto;
 }

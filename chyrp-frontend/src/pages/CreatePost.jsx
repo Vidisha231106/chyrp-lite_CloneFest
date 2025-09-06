@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api';
+import MultiFileUploader from '../components/MultiFileUploader';
 import './CreatePost.css';
 
 const CreatePost = () => {
@@ -10,8 +11,10 @@ const CreatePost = () => {
   const [clean, setClean] = useState(''); // URL Slug
   const [body, setBody] = useState('');
   const [isPage, setIsPage] = useState(false);
-  const [feather, setFeather] = useState('text'); // 'text' | 'photo' | 'quote' | 'link'
+  const [feather, setFeather] = useState('text'); // 'text' | 'photo' | 'quote' | 'link' | 'video' | 'audio'
   const [photoFile, setPhotoFile] = useState(null);
+  const [videoFile, setVideoFile] = useState(null);
+  const [audioFile, setAudioFile] = useState(null);
   const [quote, setQuote] = useState('');
   const [attribution, setAttribution] = useState('');
   const [url, setUrl] = useState('');
@@ -42,6 +45,12 @@ const CreatePost = () => {
     }
   };
 
+
+  const handleUploadComplete = (uploadedUrls) => {
+    console.log('Files uploaded successfully:', uploadedUrls);
+    // You can add logic here to handle the uploaded URLs
+    // For example, add them to the post body or show them in a preview
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -82,6 +91,28 @@ const CreatePost = () => {
         form.append('description', description);
         form.append('status', status);
         await apiClient.post('/posts/link', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      } else if (feather === 'video') {
+        if (!videoFile) {
+          setError('Please choose a video file to upload.');
+          return;
+        }
+        const form = new FormData();
+        form.append('clean', clean);
+        form.append('title', title);
+        form.append('status', status);
+        form.append('file', videoFile);
+        await apiClient.post('/posts/video', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      } else if (feather === 'audio') {
+        if (!audioFile) {
+          setError('Please choose an audio file to upload.');
+          return;
+        }
+        const form = new FormData();
+        form.append('clean', clean);
+        form.append('title', title);
+        form.append('status', status);
+        form.append('file', audioFile);
+        await apiClient.post('/posts/audio', form, { headers: { 'Content-Type': 'multipart/form-data' } });
       } else {
         const postData = {
           content_type: isPage ? 'page' : 'post',
@@ -137,6 +168,12 @@ const CreatePost = () => {
           <label>
             <input type="radio" name="feather" value="link" checked={feather === 'link'} onChange={() => setFeather('link')} /> Link
           </label>
+          <label>
+            <input type="radio" name="feather" value="video" checked={feather === 'video'} onChange={() => setFeather('video')} /> Video
+          </label>
+          <label>
+            <input type="radio" name="feather" value="audio" checked={feather === 'audio'} onChange={() => setFeather('audio')} /> Audio
+          </label>
         </div>
 
         {/* Title field - hide for quote posts */}
@@ -166,6 +203,16 @@ const CreatePost = () => {
             <label>Choose image to upload:</label>
             <input type="file" accept="image/*" onChange={(e) => setPhotoFile(e.target.files?.[0] || null)} required />
           </div>
+        ) : feather === 'video' ? (
+          <div>
+            <label>Choose video file to upload:</label>
+            <input type="file" accept="video/*" onChange={(e) => setVideoFile(e.target.files?.[0] || null)} required />
+          </div>
+        ) : feather === 'audio' ? (
+          <div>
+            <label>Choose audio file to upload:</label>
+            <input type="file" accept="audio/*" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} required />
+          </div>
         ) : feather === 'quote' ? (
           <div>
             <textarea value={quote} onChange={(e) => setQuote(e.target.value)} placeholder="Enter the quote..." rows="8" required />
@@ -186,6 +233,11 @@ const CreatePost = () => {
           <button type="submit">Submit</button>
         </div>
       </form>
+      
+      {/* Multi-File Uploader Section */}
+      <div style={{ marginTop: '40px', padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
+        <MultiFileUploader onUploadComplete={handleUploadComplete} />
+      </div>
     </div>
   );
 };

@@ -1,0 +1,185 @@
+/* src/components/CodeHighlighter.css */
+
+.code-processing {
+  padding: 1rem;
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.highlighted-content {
+  line-height: 1.6;
+}
+
+.code-block {
+  margin: 1.5rem 0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e9ecef;
+}
+
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  font-size: 0.875rem;
+}
+
+.code-language {
+  font-weight: 600;
+  color: #495057;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.copy-button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.copy-button:hover {
+  background: #0056b3;
+}
+
+.code-content {
+  margin: 0;
+  padding: 1rem;
+  background: #f8f9fa;
+  overflow-x: auto;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.code-content code {
+  background: none;
+  padding: 0;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: #333;
+}
+
+/* Syntax highlighting styles */
+.highlighted-content .keyword {
+  color: #d73a49;
+  font-weight: 600;
+}
+
+.highlighted-content .string {
+  color: #032f62;
+}
+
+.highlighted-content .comment {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.highlighted-content .tag {
+  color: #22863a;
+}
+
+.highlighted-content .attr {
+  color: #6f42c1;
+}
+
+.highlighted-content .selector {
+  color: #e36209;
+}
+
+.highlighted-content .property {
+  color: #005cc5;
+}
+
+.highlighted-content .value {
+  color: #032f62;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .code-block {
+    margin: 1rem 0;
+    border-radius: 6px;
+  }
+  
+  .code-header {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+  
+  .code-content {
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+  }
+  
+  .copy-button {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .code-block {
+    border-color: #495057;
+  }
+  
+  .code-header {
+    background: #343a40;
+    border-bottom-color: #495057;
+  }
+  
+  .code-language {
+    color: #adb5bd;
+  }
+  
+  .code-content {
+    background: #343a40;
+  }
+  
+  .code-content code {
+    color: #e9ecef;
+  }
+  
+  .highlighted-content .keyword {
+    color: #ff7b72;
+  }
+  
+  .highlighted-content .string {
+    color: #a5d6ff;
+  }
+  
+  .highlighted-content .comment {
+    color: #8b949e;
+  }
+  
+  .highlighted-content .tag {
+    color: #7ee787;
+  }
+  
+  .highlighted-content .attr {
+    color: #d2a8ff;
+  }
+  
+  .highlighted-content .selector {
+    color: #ffa657;
+  }
+  
+  .highlighted-content .property {
+    color: #79c0ff;
+  }
+  
+  .highlighted-content .value {
+    color: #a5d6ff;
+  }
+}

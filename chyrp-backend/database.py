@@ -7,9 +7,21 @@ from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Use Supabase PostgreSQL database URL
+DATABASE_URL = os.getenv("SUPABASE_DATABASE_URL")
 
-engine = create_engine(DATABASE_URL)
+# Fallback to local SQLite if Supabase URL not provided
+if not DATABASE_URL:
+    DATABASE_URL = "sqlite:///./blog.db"
+
+# Create engine with connection pooling for better performance
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=10,
+    max_overflow=20,
+    pool_pre_ping=True,  # Verify connections before use
+    pool_recycle=300,    # Recycle connections every 5 minutes
+)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

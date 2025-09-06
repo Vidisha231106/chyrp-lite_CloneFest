@@ -3,7 +3,7 @@
 import datetime
 from typing import List, Optional # Ensure List is imported
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import APIKeyHeader
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -76,6 +76,32 @@ async def get_current_user(token: str = Depends(api_key_scheme), db: Session = D
         raise credentials_exception
     return user
 
+async def get_optional_current_user(request: Request, db: Session = Depends(get_db)):
+    """Get current user if authenticated, otherwise return None."""
+    # Get Authorization header manually
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        return None
+    
+    try:
+        token_type, token_value = auth_header.split()
+        if token_type.lower() != "bearer":
+            return None
+    except (ValueError, AttributeError):
+        return None
+    
+    try:
+        payload = jwt.decode(token_value, SECRET_KEY, algorithms=[ALGORITHM])
+        login: str = payload.get("sub")
+        if login is None:
+            return None
+        token_data = schemas.TokenData(login=login)
+    except JWTError:
+        return None
+    
+    user = db.query(models.User).filter(models.User.login == token_data.login).first()
+    return user
+
 # --- NEW: Add the missing permission dependency function ---
 def require_permission(required_permissions: List[str]):
     """
@@ -121,19 +147,4 @@ def require_post_permission(perm_any: str, perm_own: str):
         )
     return checker
 
-# --- NEW: Add a dependency for OPTIONAL user authentication ---
-async def get_optional_current_user(token: str = Depends(api_key_scheme), db: Session = Depends(get_db)):
-    """
-    Dependency to get the current user if a valid token is provided,
-    but does not raise an exception if the token is missing or invalid.
-    Returns the user object or None.
-    """
-    if token is None:
-        return None
-    try:
-        # Re-use the logic from get_current_user
-        user = await get_current_user(token, db)
-        return user
-    except HTTPException:
-        # If token is invalid or user not found, simply return None
-        return None
+# Remove duplicate function - already defined above
