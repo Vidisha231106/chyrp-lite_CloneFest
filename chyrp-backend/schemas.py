@@ -197,11 +197,17 @@ class PostModel(PostBase):
     liked_by_users: List[UserLikeInfo] = []
     tags: List[TagModel] = []
     categories: List[CategoryModel] = []
+    comments: List["CommentModel"] = []  # <-- ADD THIS LINE
 
     @computed_field
     @property
     def likes_count(self) -> int:
         return len(self.liked_by_users)
+
+    @computed_field
+    @property
+    def comments_count(self) -> int:
+        return len(self.comments)
 
     class Config:
         from_attributes = True
@@ -268,3 +274,7 @@ class CascadeCategoryPostsResponse(CascadePostsResponse):
 class CascadeUserPostsResponse(CascadePostsResponse):
     user_id: int
     user_name: str
+
+class CommentCreateWithMaptcha(CommentCreate):
+    maptcha_challenge_id: str
+    maptcha_answer: str

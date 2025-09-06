@@ -14,7 +14,7 @@ router = APIRouter(
     tags=["Views"],
 )
 
-@router.post("/posts/{post_id}/view", response_model=schemas.PostModel)
+@router.post("/views/posts/{post_id}", response_model=schemas.PostViewModel) # <-- 1. CHANGE THIS URL
 def track_post_view(
     post_id: int,
     request: Request,
@@ -26,24 +26,26 @@ def track_post_view(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     
-    # Get client IP and user agent
     client_ip = request.client.host
     user_agent = request.headers.get("user-agent", "")
     
-    # Check if this is a duplicate view (same user/IP within last hour)
     one_hour_ago = datetime.datetime.utcnow() - datetime.timedelta(hours=1)
     
-    existing_view = db.query(PostView).filter(
+    # Build the query to check for an existing view
+    query = db.query(PostView).filter(
         PostView.post_id == post_id,
-        or_(
-            and_(PostView.user_id == current_user.id, PostView.user_id.isnot(None)) if current_user else False,
-            and_(PostView.ip_address == client_ip, PostView.user_id.is_(None))
-        ),
         PostView.viewed_at > one_hour_ago
-    ).first()
+    )
+
+    if current_user:
+        query = query.filter(PostView.user_id == current_user.id)
+    else:
+        query = query.filter(PostView.ip_address == client_ip)
+
+    existing_view = query.first()
     
+    # This entire block can be simplified as well, but we'll focus on the main fix.
     if not existing_view:
-        # Create new view record
         view = PostView(
             post_id=post_id,
             user_id=current_user.id if current_user else None,
@@ -52,12 +54,16 @@ def track_post_view(
         )
         db.add(view)
         
-        # Increment post view count
-        post.view_count += 1
+        # --- 2. (Optional but Recommended) MAKE THIS MORE ROBUST ---
+        post.view_count = (post.view_count or 0) + 1
+        
         db.commit()
         db.refresh(post)
     
-    return post
+    # To avoid returning the entire post object, we can return a simple view model
+    # This matches the response_model=schemas.PostViewModel
+    final_view = db.query(PostView).filter(PostView.post_id == post_id).order_by(PostView.viewed_at.desc()).first()
+    return final_view
 
 @router.get("/posts/{post_id}/views", response_model=List[schemas.PostViewModel])
 def get_post_views(

@@ -43,12 +43,20 @@ const Comments = ({ postId, currentUser }) => {
 
     setSubmitting(true);
     try {
-      const response = await apiClient.post(`/posts/${postId}/comments/with-maptcha`, {
-        body: newComment,
-        maptcha_id: maptchaChallenge.id,
+      // --- CORRECTED PAYLOAD ---
+      const payload = {
+        content: newComment, // Changed 'body' to 'content'
+        maptcha_challenge_id: maptchaChallenge.challenge_id, // Corrected key and property
         maptcha_answer: maptchaAnswer
-      });
-      
+      };
+
+      const response = await apiClient.post(
+        `/posts/${postId}/comments/with-maptcha`,
+        payload // Send the corrected payload
+      );
+
+      // Note: The comment object from the backend might have 'content', not 'body'.
+      // You may need to update the rendering logic if comments don't appear right.
       setComments([response.data, ...comments]);
       setNewComment('');
       setMaptchaAnswer('');
@@ -78,7 +86,7 @@ const Comments = ({ postId, currentUser }) => {
   return (
     <div className="comments-section">
       <h3>Comments ({comments.length})</h3>
-      
+
       {/* Comment Form */}
       <form onSubmit={handleSubmitComment} className="comment-form">
         <div className="form-group">
@@ -92,7 +100,7 @@ const Comments = ({ postId, currentUser }) => {
             required
           />
         </div>
-        
+
         {/* MAPTCHA Challenge */}
         {maptchaChallenge && (
           <div className="maptcha-challenge">
@@ -109,11 +117,11 @@ const Comments = ({ postId, currentUser }) => {
             />
           </div>
         )}
-        
+
         <button type="submit" disabled={submitting || !currentUser}>
           {submitting ? 'Submitting...' : 'Submit Comment'}
         </button>
-        
+
         {!currentUser && (
           <p className="login-prompt">
             Please <a href="/login">login</a> to post comments.
@@ -133,7 +141,7 @@ const Comments = ({ postId, currentUser }) => {
                 <span className="comment-date">{formatDate(comment.created_at)}</span>
               </div>
               <div className="comment-body">
-                {comment.body}
+                {comment.content}
               </div>
             </div>
           ))

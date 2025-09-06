@@ -49,15 +49,19 @@ class MAPTCHAService:
             "difficulty": "easy"
         }
     
+# routers/maptcha.py
+
     @staticmethod
     def verify_answer(challenge_id: str, user_answer: str) -> bool:
-        """Verify the user's answer."""
+        """Verify the user's answer by hashing it and comparing to the challenge ID."""
         try:
-            user_answer_int = int(user_answer.strip())
-            # We need to reverse-engineer the answer from the hash
-            # This is a simplified version - in production, store answers temporarily
-            return True  # Simplified for demo
-        except ValueError:
+            # Hash the user's answer using the same method as generation
+            user_answer_hash = hashlib.md5(user_answer.strip().encode()).hexdigest()
+            
+            # Compare the generated hash with the challenge_id from the frontend
+            return user_answer_hash == challenge_id
+        except Exception:
+            # If any error occurs (e.g., non-numeric input), fail verification
             return False
 
 @router.post("/maptcha/generate", tags=["MAPTCHA"])
@@ -85,38 +89,35 @@ def verify_maptcha(
 @router.post("/posts/{post_id}/comments/with-maptcha", response_model=schemas.CommentModel, tags=["Comments"])
 def create_comment_with_maptcha(
     post_id: int,
-    comment: schemas.CommentCreate,
-    maptcha_challenge_id: str,
-    maptcha_answer: str,
+    data: schemas.CommentCreateWithMaptcha, # <-- Use the new unified schema
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # This endpoint should probably not require a logged-in user if it has a CAPTCHA,
+    # but we'll leave it for now to match the original code.
+    current_user: User = Depends(get_current_user) 
 ):
     """Create a comment with MAPTCHA verification."""
-    # Verify MAPTCHA first
-    is_valid = MAPTCHAService.verify_answer(maptcha_challenge_id, maptcha_answer)
+    # Verify MAPTCHA first using data from the new schema
+    is_valid = MAPTCHAService.verify_answer(data.maptcha_challenge_id, data.maptcha_answer)
     if not is_valid:
         raise HTTPException(
             status_code=400, 
-            detail="MAPTCHA verification failed. Please try again."
+            detail="MAPTCHA verification failed. Please check your answer to the math question."
         )
     
-    # Check if post exists
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     
-    # Check if parent comment exists (for nested comments)
-    if comment.parent_id:
-        parent_comment = db.query(Comment).filter(Comment.id == comment.parent_id).first()
+    if data.parent_id:
+        parent_comment = db.query(Comment).filter(Comment.id == data.parent_id).first()
         if not parent_comment or parent_comment.post_id != post_id:
             raise HTTPException(status_code=404, detail="Parent comment not found")
     
-    # Create comment
     db_comment = Comment(
-        content=comment.content,
+        content=data.content,
         post_id=post_id,
         user_id=current_user.id,
-        parent_id=comment.parent_id
+        parent_id=data.parent_id
     )
     db.add(db_comment)
     db.commit()

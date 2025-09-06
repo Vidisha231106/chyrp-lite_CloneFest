@@ -18,17 +18,28 @@ const Post = () => {
   const { postId } = useParams();
   const navigate = useNavigate();
 
+  // src/pages/Post.jsx
+
   useEffect(() => {
     const fetchPostAndUser = async () => {
       try {
+        // --- Step 1: Fetch the post data ---
         const postResponse = await apiClient.get(`/posts/${postId}`);
         setPost(postResponse.data);
 
-        // This will fail gracefully if the user is not logged in
+        // --- Step 2 (NEW): Record the view ---
+        // This is a "fire-and-forget" call; we don't need the response.
+        // A separate try/catch ensures that if this fails, the post still loads.
+        try {
+          apiClient.post(`/views/posts/${postId}`);
+        } catch (viewError) {
+          console.error("Failed to record view:", viewError);
+        }
+
+        // --- Step 3: Fetch the current user ---
         const userResponse = await apiClient.get('/users/me');
         setCurrentUser(userResponse.data);
       } catch (error) {
-        // If getting the user fails, we still have the post data
         if (error.response?.status !== 401) {
           console.error("Error fetching data:", error);
         }
@@ -39,17 +50,7 @@ const Post = () => {
     fetchPostAndUser();
   }, [postId]);
 
-  const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this post?')) {
-      try {
-        await apiClient.delete(`/posts/${postId}`);
-        navigate('/');
-      } catch {
-        alert('Failed to delete post. You may not have permission.');
-      }
-    }
-  };
-
+  
   const handleLike = async () => {
     if (!currentUser) {
       alert("You must be logged in to like a post.");
@@ -86,10 +87,14 @@ const Post = () => {
       <header className="post-header">
         <Link to="/" className="back-link">← Back to Home</Link>
         <h1>{post.title || post.clean}</h1>
-        <div className="post-meta">
+        {/* --- UPDATED META SECTION --- */}
+        <div className="post-card-meta">
           <span>By {post.owner.login}</span>
-          {/* --- THIS IS THE CORRECTED LINE --- */}
           <span>{new Date(post.created_at).toLocaleDateString()}</span>
+          <span className="post-card-stats">
+            ❤️ {post.likes_count}
+            <span style={{ marginLeft: '10px' }}>💬 {post.comments_count}</span>
+          </span>
           {canEdit && <Link to={`/edit-post/${post.id}`} className="btn-edit">Edit</Link>}
           {canDelete && <button onClick={handleDelete} className="btn-delete">Delete</button>}
         </div>
@@ -230,9 +235,6 @@ const Post = () => {
         </button>
         <span className="like-count">
           {post.likes_count} {post.likes_count === 1 ? 'like' : 'likes'}
-        </span>
-        <span className="view-count">
-          👁️ {post.view_count || 0} {post.view_count === 1 ? 'view' : 'views'}
         </span>
       </footer>
 

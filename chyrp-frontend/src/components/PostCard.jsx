@@ -78,7 +78,7 @@ const PostCard = ({ post }) => {
           <span className="post-author">By {post.owner.login}</span>
           <span className="post-date">{formatDate(post.created_at)}</span>
           <span className="like-display">❤️ {post.likes_count}</span>
-          <span className="view-display">👁️ {post.view_count || 0}</span>
+          <span className="comment-display">💬 {post.comments_count}</span>
         </div>
         
         {/* Tags and Categories */}
