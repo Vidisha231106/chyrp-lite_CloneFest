@@ -1,5 +1,4 @@
 // src/pages/Home.jsx
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../api';
@@ -10,13 +9,22 @@ import './Home.css';
 const Home = () => {
 
   return (
-    <div className="home">
-      <div className="container">
-        <section className="hero">
-          <h1>Welcome to My Awesome Site</h1>
-          <p className="hero-subtitle">
-            Discover insights, tutorials, and stories from the world of technology and development.
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-black">
+      <div className="max-w-3xl mx-auto px-4 py-12">
+        {/* Hero */}
+        <section className="text-center mb-12">
+          <h1 className="text-5xl md:text-6xl font-extrabold glow-heading animate-hue-spin">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-600">
+              Chyrp Modern
+            </span>
+          </h1>
+          <p className="mt-4 text-gray-400 max-w-2xl mx-auto">
+            A Modern Blogging Website
           </p>
+          <div className="mt-6 flex justify-center gap-4">
+            <Link to="/create-post" className="btn-primary">Create Post</Link>
+            <Link to="/about" className="btn-ghost">Learn more</Link>
+          </div>
         </section>
 
         <section className="latest-posts">
@@ -31,6 +39,6 @@ const Home = () => {
       </div>
     </div>
   );
-};
+}
 
 export default Home;
