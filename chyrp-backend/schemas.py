@@ -243,3 +243,28 @@ class AIEnhanceRequest(BaseModel):
 
 class AIEnhanceResponse(BaseModel):
     enhanced_text: str
+
+
+class PaginatedPosts(BaseModel):
+    posts: List[PostModel]
+    next_cursor: Optional[int] = None
+
+# In schemas.py, add these new classes at the end of the file
+
+class CascadePostsResponse(BaseModel):
+    posts: List[PostModel]
+    has_more: bool
+    next_cursor: Optional[str] = None
+    total_returned: int
+
+class CascadeTagPostsResponse(CascadePostsResponse):
+    tag_id: int
+    tag_name: str
+
+class CascadeCategoryPostsResponse(CascadePostsResponse):
+    category_id: int
+    category_name: str
+
+class CascadeUserPostsResponse(CascadePostsResponse):
+    user_id: int
+    user_name: str

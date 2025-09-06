@@ -9,6 +9,8 @@ import sys
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
+from database import engine, Base
+from models import *  # Import all models
 
 # Load environment variables
 load_dotenv()
@@ -34,10 +36,7 @@ def test_supabase_connection():
 
 def create_tables():
     """Create all tables in Supabase database."""
-    try:
-        from database import engine, Base
-        from models import *  # Import all models
-        
+    try:        
         print("🔄 Creating tables in Supabase database...")
         Base.metadata.create_all(bind=engine)
         print("✅ All tables created successfully")

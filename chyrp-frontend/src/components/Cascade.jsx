@@ -35,7 +35,7 @@ const Cascade = ({
       };
       
       const response = await apiClient.get(endpoint, { params });
-      const newItems = response.data.items || response.data;
+      const newItems = response.data.posts || []; // Use 'posts' and fallback to an empty array
       const newCursor = response.data.next_cursor;
       
       if (reset) {

@@ -70,6 +70,7 @@ BUCKET_NAME = "media_uploads"  # The name of the bucket you created in Supabase
 # --- CORS Middleware ---
 origins = [
     "http://localhost:5173",
+    "http://127.0.0.1:5173"
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -103,38 +104,83 @@ setup_cache()
 # 2. STARTUP EVENT (DATABASE SEEDING)
 # ===============================================================================
 @app.on_event("startup")
+@app.on_event("startup")
 def create_initial_data():
     db = SessionLocal()
     try:
-        if db.query(models.Group).first() is None:
-            print("Database is empty. Seeding initial data...")
-            
-            # Create Groups
-            admin_permissions = ["edit_post", "delete_post", "add_user", "edit_user", "delete_user", "add_group", "edit_group", "delete_group", "like_post", "add_post", "edit_own_post", "delete_own_post"]  # Added missing permissions for admin
-            member_permissions = ["add_post", "edit_own_post", "delete_own_post", "like_post"]
-            admin_group = models.Group(name="Admin", permissions=admin_permissions)
-            member_group = models.Group(name="Member", permissions=member_permissions)
+        print("🚀 Checking and seeding initial database data...")
+
+        # --- Define required permissions ---
+        admin_permissions_set = {
+            "edit_post", "delete_post", "add_user", "edit_user", "delete_user",
+            "add_group", "edit_group", "delete_group", "like_post", "add_post",
+            "edit_own_post", "delete_own_post"
+        }
+        member_permissions_set = {
+            "add_post", "edit_own_post", "delete_own_post", "like_post"
+        }
+
+        # --- Check and Create/Update Admin Group ---
+        admin_group = db.query(models.Group).filter(models.Group.name == "Admin").first()
+        if not admin_group:
+            print("Creating 'Admin' group...")
+            admin_group = models.Group(name="Admin", permissions=list(admin_permissions_set))
             db.add(admin_group)
+        else:
+            # If group exists, ensure all permissions are present
+            current_permissions = set(admin_group.permissions)
+            if not admin_permissions_set.issubset(current_permissions):
+                print("Updating 'Admin' group with missing permissions...")
+                missing = admin_permissions_set - current_permissions
+                admin_group.permissions.extend(list(missing))
+
+        # --- Check and Create/Update Member Group ---
+        member_group = db.query(models.Group).filter(models.Group.name == "Member").first()
+        if not member_group:
+            print("Creating 'Member' group...")
+            member_group = models.Group(name="Member", permissions=list(member_permissions_set))
             db.add(member_group)
-            db.commit()
-            db.refresh(admin_group)
-            
-            # Create Admin User
+        else:
+            # If group exists, ensure all permissions are present
+            current_permissions = set(member_group.permissions)
+            if not member_permissions_set.issubset(current_permissions):
+                print("Updating 'Member' group with missing permissions...")
+                missing = member_permissions_set - current_permissions
+                member_group.permissions.extend(list(missing))
+        
+        db.commit()
+        db.refresh(admin_group)
+        db.refresh(member_group)
+        
+        # --- Check and Create Admin User ---
+        if not db.query(models.User).filter(models.User.login == "admin").first():
+            print("Creating default 'admin' user...")
             hashed_password = get_password_hash("admin")
-            admin_user = models.User(login="admin", email="admin@example.com", full_name="Administrator", hashed_password=hashed_password, group_id=admin_group.id)
+            admin_user = models.User(
+                login="admin",
+                email="admin@example.com",
+                full_name="Administrator",
+                hashed_password=hashed_password,
+                group_id=admin_group.id
+            )
             db.add(admin_user)
             db.commit()
             db.refresh(admin_user)
 
-            # Create Static Pages
-            about_page = models.Post(content_type="page", title="About Us", body="## Welcome!\n\nThis is the default 'About Us' page.", clean="about-us", status="public", user_id=admin_user.id)
-            contact_page = models.Post(content_type="page", title="Contact", body="This is the default 'Contact' page.", clean="contact", status="public", user_id=admin_user.id)
-            db.add(about_page)
-            db.add(contact_page)
+            # Create Static Pages only when admin is first created
+            if not db.query(models.Post).filter(models.Post.clean == "about-us").first():
+                about_page = models.Post(content_type="page", title="About Us", body="## Welcome!\n\nThis is the default 'About Us' page.", clean="about-us", status="public", user_id=admin_user.id)
+                db.add(about_page)
+            if not db.query(models.Post).filter(models.Post.clean == "contact").first():
+                contact_page = models.Post(content_type="page", title="Contact", body="This is the default 'Contact' page.", clean="contact", status="public", user_id=admin_user.id)
+                db.add(contact_page)
             db.commit()
-            print("Initial data created successfully.")
-        else:
-            print("Database already contains data. Skipping seeding.")
+        
+        print("✅ Initial data check completed successfully.")
+
+    except Exception as e:
+        print(f"❌ An error occurred during initial data seeding: {e}")
+        db.rollback() # Rollback changes on error
     finally:
         db.close()
 
@@ -277,7 +323,7 @@ def create_post(
 
 # --- MODIFIED: Update the read_posts endpoint ---
 @app.get("/posts/", response_model=List[schemas.PostModel], tags=["Posts"])
-@cache_for_5_minutes()
+#@cache_for_5_minutes()
 def read_posts(
     content_type: Optional[str] = None, 
     skip: int = 0, 
