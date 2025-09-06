@@ -1,196 +1,54 @@
-.create-post-page {
-  padding: 2rem 0;
-  min-height: calc(100vh - 200px);
-}
-
-.create-post-container {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.create-post-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.create-post-header h1 {
-  font-size: 2rem;
-  margin: 0;
-}
-
-.content-type-toggle {
-  display: flex;
-  align-items: center;
-}
-
-.toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  color: var(--text-color);
-}
-
-.toggle-label input[type="checkbox"] {
-  margin: 0;
-}
-
-.create-post-form {
-  background: white;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
-  padding: 2rem;
-}
-
-.form-row {
-  margin-bottom: 2rem;
-}
-
-.form-row:last-of-type {
-  margin-bottom: 0;
-}
-
-.form-help {
-  display: block;
-  margin-top: 0.5rem;
-  color: var(--text-light);
-  font-size: 0.8125rem;
-}
-
-.content-editor {
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  line-height: 1.6;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.draft-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.draft-status {
-  font-size: 0.875rem;
-  color: var(--text-light);
-  font-weight: 500;
-}
-
-.publish-actions {
-  display: flex;
-  gap: 1rem;
-}
-
-.error-message {
-  background-color: #fee2e2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  padding: 0.75rem;
-  border-radius: var(--radius-md);
-  font-size: 0.875rem;
-  margin-bottom: 1.5rem;
-}
-
-@media (max-width: 768px) {
-  .create-post-page {
-    padding: 1rem 0;
-  }
-
-  .create-post-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .create-post-header h1 {
-    font-size: 1.75rem;
-  }
-
-  .create-post-form {
-    padding: 1.5rem;
-  }
-
-  .form-actions {
-    flex-direction: column-reverse;
-    align-items: stretch;
-    gap: 1rem;
-  }
-
-  .draft-actions,
-  .publish-actions {
-    justify-content: center;
-  }
-
-  .publish-actions button {
-    width: 100%;
-  }
-}
-
-@media (max-width: 480px) {
-  .create-post-form {
-    padding: 1rem;
-  }
-
-  .content-editor {
-    font-size: 0.8125rem;
-  }
-}
-
 /* src/pages/CreatePost.css */
 
 .create-post-container {
   max-width: 800px;
-  margin: 40px auto;
-  padding: 30px;
+  margin: 2rem auto;
+  padding: 2rem;
   background-color: #fff;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* ... existing styles ... */
+.create-post-container h1 {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: #333;
+}
 
-.form-actions {
+.create-post-container form {
   display: flex;
-  justify-content: flex-end;
-  gap: 15px;
-  margin-top: 20px;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-.form-actions select,
-.form-actions button {
-  padding: 10px 20px;
-  border-radius: 5px;
+/* General styles for form inputs */
+.create-post-container input[type="text"],
+.create-post-container input[type="url"],
+.create-post-container textarea,
+.create-post-container select {
+  width: 100%;
+  padding: 12px;
   border: 1px solid #ccc;
-  font-size: 1em;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+  box-sizing: border-box; /* Ensures padding doesn't affect width */
 }
 
-.form-actions button {
-  background-color: #007bff;
-  color: white;
+.create-post-container textarea {
+  resize: vertical;
+  min-height: 200px;
+}
+
+.create-post-container input:focus,
+.create-post-container textarea:focus,
+.create-post-container select:focus {
+  outline: none;
   border-color: #007bff;
-  cursor: pointer;
-  transition: background-color 0.2s;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
-.form-actions button:hover {
-  background-color: #0056b3;
-}
-
-/* --- NEW STYLES for AI feature --- */
+/* Styles for the editor and AI button */
 .editor-wrapper {
   position: relative;
 }
@@ -200,7 +58,7 @@
   bottom: 15px;
   right: 15px;
   padding: 8px 16px;
-  background-color: #6a0dad; /* A nice purple for AI */
+  background-color: #6a0dad; /* Purple for AI */
   color: white;
   border: none;
   border-radius: 20px;
@@ -221,11 +79,58 @@
   cursor: not-allowed;
 }
 
+/* Styles for the tag and category select boxes */
+.taxonomy-selectors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* Styles for the bottom action buttons */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e9ecef;
+}
+
+.form-actions button[type="submit"] {
+  padding: 12px 24px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.form-actions button[type="submit"]:hover {
+  background-color: #0056b3;
+}
+
+/* Error message styling */
 .error-message {
-  color: #d9534f;
-  background-color: #f2dede;
-  border: 1px solid #ebccd1;
-  padding: 15px;
+  color: #dc3545;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  padding: 1rem;
   border-radius: 4px;
-  margin-bottom: 20px;
+  margin-bottom: 1.5rem;
 }

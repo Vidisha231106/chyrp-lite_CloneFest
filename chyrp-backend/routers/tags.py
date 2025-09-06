@@ -5,11 +5,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
 import re
-
+import schemas
 from dependencies import get_db, get_current_user, require_permission
 from models import Tag, Post, User
-import schemas
+from schemas import TagModel, PaginatedPosts # <-- EDIT THIS LINE
 from cache import cache_for_1_hour, cache_for_5_minutes
+from schemas import TagModel, PaginatedPosts
 
 router = APIRouter(
     tags=["Tags"],
@@ -56,7 +57,6 @@ def create_tag(
     return db_tag
 
 @router.get("/tags", response_model=List[schemas.TagModel])
-@cache_for_1_hour()
 def get_tags(
     skip: int = 0,
     limit: int = 100,
@@ -73,7 +73,6 @@ def get_tags(
     return tags
 
 @router.get("/tags/popular", response_model=List[schemas.TagModel])
-@cache_for_5_minutes()
 def get_popular_tags(
     limit: int = 20,
     db: Session = Depends(get_db)
@@ -204,17 +203,44 @@ def remove_tag_from_post(
     db.refresh(post)
     return post
 
-@router.get("/tags/{tag_id}/posts", response_model=List[schemas.PostModel])
+@router.get("/tags/{tag_id}/posts", response_model=PaginatedPosts)
 def get_posts_by_tag(
     tag_id: int,
     skip: int = 0,
     limit: int = 20,
     db: Session = Depends(get_db)
 ):
-    """Get all posts with a specific tag."""
+    """Get all public posts with a specific tag."""
     tag = db.query(Tag).filter(Tag.id == tag_id).first()
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
     
-    posts = db.query(Post).join(Post.tags).filter(Tag.id == tag_id).offset(skip).limit(limit).all()
-    return posts
+    # Add a filter for Post.status
+    posts = db.query(Post).join(Post.tags).filter(
+        Tag.id == tag_id,
+        Post.status == 'public' # <-- ADD THIS LINE
+    ).order_by(Post.created_at.desc()).offset(skip).limit(limit).all()
+    
+    # Return the data in the format the frontend expects
+    return {"posts": posts}
+
+@router.post("/tags/get-or-create", response_model=List[schemas.TagModel])
+def get_or_create_tags(
+    tag_names: List[str],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get existing tags or create new ones for a list of tag names."""
+    final_tags = []
+    for name in tag_names:
+        name = name.strip()
+        if not name:
+            continue
+        db_tag = db.query(Tag).filter(Tag.name.ilike(name)).first()
+        if not db_tag:
+            db_tag = Tag(name=name, slug=create_slug(name))
+            db.add(db_tag)
+            db.commit()
+            db.refresh(db_tag)
+        final_tags.append(db_tag)
+    return final_tags

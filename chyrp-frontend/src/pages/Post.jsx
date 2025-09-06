@@ -50,7 +50,19 @@ const Post = () => {
     fetchPostAndUser();
   }, [postId]);
 
-  
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to delete this post?')) {
+      try {
+        await apiClient.delete(`/posts/${postId}`);
+        navigate('/'); // Redirect to home page after deletion
+      } catch (error) {
+        console.error("Failed to delete post:", error);
+        alert('Failed to delete post. You may not have permission.');
+      }
+    }
+  };
+
+
   const handleLike = async () => {
     if (!currentUser) {
       alert("You must be logged in to like a post.");
@@ -98,32 +110,34 @@ const Post = () => {
           {canEdit && <Link to={`/edit-post/${post.id}`} className="btn-edit">Edit</Link>}
           {canDelete && <button onClick={handleDelete} className="btn-delete">Delete</button>}
         </div>
-        
+
         {/* Tags and Categories */}
-        {(post.tags && post.tags.length > 0) || (post.categories && post.categories.length > 0) ? (
-          <div className="post-taxonomy">
-            {post.tags && post.tags.length > 0 && (
-              <div className="post-tags">
-                <span className="taxonomy-label">Tags:</span>
-                {post.tags.map(tag => (
-                  <span key={tag.id} className="tag" style={{ backgroundColor: tag.color }}>
+        <div className="post-taxonomy">
+          {post.tags?.length > 0 && (
+            <div className="post-tags">
+              <span className="taxonomy-label">Tags:</span>
+              {post.tags.map(tag => (
+                <Link to={`/tags/${tag.slug}`} key={tag.id} className="tag-link">
+                  <span className="tag" style={{ backgroundColor: tag.color }}>
                     {tag.name}
                   </span>
-                ))}
-              </div>
-            )}
-            {post.categories && post.categories.length > 0 && (
-              <div className="post-categories">
-                <span className="taxonomy-label">Categories:</span>
-                {post.categories.map(category => (
-                  <span key={category.id} className="category" style={{ backgroundColor: category.color }}>
+                </Link>
+              ))}
+            </div>
+          )}
+          {post.categories?.length > 0 && (
+            <div className="post-categories">
+              <span className="taxonomy-label">Categories:</span>
+              {post.categories.map(category => (
+                <Link to={`/categories/${category.slug}`} key={category.id} className="category-link">
+                  <span className="category" style={{ backgroundColor: category.color }}>
                     {category.name}
                   </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : null}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </header>
       <div className="post-content">
         {post.feather === 'photo' ? (
@@ -226,8 +240,8 @@ const Post = () => {
         )}
       </div>
       <footer className="post-footer">
-        <button 
-          onClick={handleLike} 
+        <button
+          onClick={handleLike}
           className={`btn-like ${isLikedByCurrentUser ? 'liked' : ''}`}
           disabled={!currentUser}
         >

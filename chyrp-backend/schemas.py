@@ -170,7 +170,7 @@ class PostBase(BaseModel):
     rights_url: Optional[str] = None
 
 class PostCreate(PostBase):
-    tag_ids: List[int] = []
+    tags: List[str] = []
     category_ids: List[int] = []
 
 class PostUpdate(BaseModel):

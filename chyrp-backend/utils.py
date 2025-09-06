@@ -77,3 +77,10 @@ def detect_embed_urls(text: str) -> list:
             })
     
     return embed_urls
+
+def create_slug(name: str) -> str:
+    """Create a URL-friendly slug from a name."""
+    # Convert to lowercase and replace spaces with hyphens
+    slug = re.sub(r'[^a-z0-9\s-]', '', name.lower())
+    slug = re.sub(r'\s+', '-', slug.strip())
+    return slug

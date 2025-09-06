@@ -18,7 +18,7 @@ const PostCard = ({ post }) => {
         <h3 className="post-title">
           <Link to={`/posts/${post.id}`}>{post.title || post.clean}</Link>
         </h3>
-        
+
         {/* Enhanced content display for different post types */}
         {post.feather === 'photo' ? (
           <Link to={`/posts/${post.id}`}>
@@ -73,39 +73,43 @@ const PostCard = ({ post }) => {
             {post.body ? `${post.body.substring(0, 150)}...` : 'This is a feather post.'}
           </p>
         )}
-        
+
         <div className="post-meta">
           <span className="post-author">By {post.owner.login}</span>
           <span className="post-date">{formatDate(post.created_at)}</span>
           <span className="like-display">❤️ {post.likes_count}</span>
           <span className="comment-display">💬 {post.comments_count}</span>
         </div>
-        
-        {/* Tags and Categories */}
-        {(post.tags && post.tags.length > 0) || (post.categories && post.categories.length > 0) ? (
+
+        {(post.tags?.length > 0 || post.categories?.length > 0) ? (
           <div className="post-taxonomy">
-            {post.tags && post.tags.length > 0 && (
+            {post.tags?.length > 0 && (
               <div className="post-tags">
                 {post.tags.slice(0, 3).map(tag => (
-                  <span key={tag.id} className="tag" style={{ backgroundColor: tag.color }}>
-                    {tag.name}
-                  </span>
+                  <Link to={`/tags/${tag.slug}`} key={tag.id} className="tag-link">
+                    <span className="tag" style={{ backgroundColor: tag.color }}>
+                      {tag.name}
+                    </span>
+                  </Link>
                 ))}
-                {post.tags.length > 3 && <span className="more-tags">+{post.tags.length - 3} more</span>}
               </div>
             )}
-            {post.categories && post.categories.length > 0 && (
+
+            {/* Add this block for categories */}
+            {post.categories?.length > 0 && (
               <div className="post-categories">
                 {post.categories.map(category => (
-                  <span key={category.id} className="category" style={{ backgroundColor: category.color }}>
-                    {category.name}
-                  </span>
+                  <Link to={`/categories/${category.slug}`} key={category.id} className="category-link">
+                    <span className="category" style={{ backgroundColor: category.color }}>
+                      {category.name}
+                    </span>
+                  </Link>
                 ))}
               </div>
             )}
           </div>
         ) : null}
-        
+
         <Link to={`/posts/${post.id}`} className="read-more">
           Read More →
         </Link>

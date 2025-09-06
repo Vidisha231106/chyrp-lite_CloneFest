@@ -2,17 +2,18 @@
 
 import datetime
 from typing import List, Optional
-
+import json
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from sqlalchemy import or_, and_
-
+from utils import generate_excerpt, create_slug
+from models import Group, User, Category, Post, Tag
 # Add upload-related imports
 from fastapi import UploadFile, File, Form
 import os
 from uuid import uuid4
 
-# import google.generativeai as genai  # Temporarily commented out for testing
+import google.generativeai as genai  # Temporarily commented out for testing
 
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,7 +34,7 @@ from dependencies import (
     get_optional_current_user,
     require_post_permission  # <-- EXISTING IMPORT
 )
-from routers import interactions, comments, tags, categories, views, maptcha, highlighter, lightbox, cascade, embed, mentionable, mathjax
+from routers import interactions, comments, tags, categories, views, maptcha, highlighter, lightbox, cascade, embed, mentionable, mathjax, search
 from cache import setup_cache, cache_for_5_minutes, cache_for_1_hour
 from utils import generate_excerpt
 
@@ -59,6 +60,7 @@ SITE_BASE_URL = os.getenv("SITE_BASE_URL", "http://localhost:5173")
 # genai.configure(api_key=GOOGLE_API_KEY)
 # generation_config = genai.GenerationConfig(temperature=0.7)
 # ai_model = genai.GenerativeModel('gemini-1.5-flash-latest', generation_config=generation_config)
+
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise Exception("Supabase credentials not found in .env file")
@@ -93,6 +95,7 @@ app.include_router(cascade.router)
 app.include_router(embed.router)
 app.include_router(mentionable.router)
 app.include_router(mathjax.router)
+app.include_router(search.router)
 
 # --- Create Database Tables on Startup ---
 models.Base.metadata.create_all(bind=engine)
@@ -103,7 +106,6 @@ setup_cache()
 # ===============================================================================
 # 2. STARTUP EVENT (DATABASE SEEDING)
 # ===============================================================================
-@app.on_event("startup")
 @app.on_event("startup")
 def create_initial_data():
     db = SessionLocal()
@@ -177,7 +179,28 @@ def create_initial_data():
             db.commit()
         
         print("✅ Initial data check completed successfully.")
+    
+        print("Seeding categories...")
+        
+        REQUIRED_CATEGORIES = [
+            "Education", "Tech", "Fashion", "Food", "Travel", 
+            "News", "Experiences", "Opinions", "Misc"
+        ]
 
+        for cat_name in REQUIRED_CATEGORIES:
+            # Check if the category already exists
+            exists = db.query(Category).filter(Category.name == cat_name).first()
+            if not exists:
+                # If it doesn't exist, create it
+                new_cat = Category(
+                    name=cat_name,
+                    slug=create_slug(cat_name) # create_slug utility generates the URL part
+                )
+                db.add(new_cat)
+                print(f"Created category: {cat_name}")
+        
+        db.commit()
+    
     except Exception as e:
         print(f"❌ An error occurred during initial data seeding: {e}")
         db.rollback() # Rollback changes on error
@@ -277,47 +300,59 @@ def read_groups(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     groups = db.query(models.Group).offset(skip).limit(limit).all()
     return groups
 
-# --- Posts/Pages Endpoints ---
+# main.py
+
 @app.post("/posts/", response_model=schemas.PostModel, tags=["Posts"])
 def create_post(
-    post: schemas.PostCreate, 
-    db: Session = Depends(get_db), 
-    current_user: models.User = Depends(get_current_user),
-    _: None = Depends(require_permission(["add_post"]))  # <-- ADD THIS PERMISSION CHECK
+    post: schemas.PostCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     # Prevent duplicate slug (clean)
     existing = db.query(models.Post).filter(models.Post.clean == post.clean).first()
     if existing:
         raise HTTPException(status_code=400, detail="A post with this slug already exists.")
     
-    # Extract tag_ids and category_ids and remove from post data
     post_data = post.dict()
-    tag_ids = post_data.pop('tag_ids', [])
-    category_ids = post_data.pop('category_ids', [])
     
+    # --- Handle Tags (find or create) ---
+    tag_names = post_data.pop('tags', [])
+    final_tags = []
+    if tag_names:
+        for name in tag_names:
+            name = name.strip()
+            if not name:
+                continue
+            db_tag = db.query(models.Tag).filter(models.Tag.name.ilike(name)).first()
+            if not db_tag:
+                db_tag = models.Tag(name=name, slug=create_slug(name))
+                db.add(db_tag)
+                # Commit here to get an ID for the new tag if needed by other logic
+                db.commit()
+                db.refresh(db_tag)
+            final_tags.append(db_tag)
+
+    # --- Handle Categories (fetch by ID) ---
+    category_ids = post_data.pop('category_ids', [])
+    final_categories = []
+    if category_ids:
+        final_categories = db.query(models.Category).filter(models.Category.id.in_(category_ids)).all()
+
     # Auto-generate excerpt if not provided
     if not post_data.get('excerpt') and post_data.get('body'):
         post_data['excerpt'] = generate_excerpt(post_data['body'])
-    
-    # Create post
+
+    # Create the Post instance
     db_post = models.Post(**post_data, user_id=current_user.id)
+    
+    # Associate the tags and categories
+    db_post.tags = final_tags
+    db_post.categories = final_categories
+    
+    # Add, commit, and refresh the final post object
     db.add(db_post)
     db.commit()
     db.refresh(db_post)
-    
-    # Add tags if provided
-    if tag_ids:
-        tags = db.query(models.Tag).filter(models.Tag.id.in_(tag_ids)).all()
-        db_post.tags.extend(tags)
-    
-    # Add categories if provided
-    if category_ids:
-        categories = db.query(models.Category).filter(models.Category.id.in_(category_ids)).all()
-        db_post.categories.extend(categories)
-    
-    if tag_ids or category_ids:
-        db.commit()
-        db.refresh(db_post)
     
     return db_post
 
@@ -432,45 +467,51 @@ async def create_photo_post(
     clean: str = Form(...),
     title: Optional[str] = Form(None),
     status: str = Form("public"),
+    tags: str = Form('[]'),
+    category_ids: str = Form('[]'),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    # Prevent duplicate slug
     existing = db.query(models.Post).filter(models.Post.clean == clean).first()
     if existing:
         raise HTTPException(status_code=400, detail="A post with this slug already exists.")
 
-    # --- MODIFIED: Replaced local file saving with Supabase upload ---
+    # Upload file to Supabase (your existing logic is correct)
     ext = os.path.splitext(file.filename)[1]
     unique_name = f"{uuid4().hex}{ext}"
-
     try:
         contents = await file.read()
-        supabase.storage.from_(BUCKET_NAME).upload(
-            path=unique_name,
-            file=contents,
-            file_options={"content-type": file.content_type}
-        )
+        supabase.storage.from_(BUCKET_NAME).upload(path=unique_name, file=contents, file_options={"content-type": file.content_type})
         file_url = supabase.storage.from_(BUCKET_NAME).get_public_url(unique_name)
-    
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
-    
     finally:
         await file.close()
 
-    # Create a post whose body is the image URL from Supabase
     db_post = models.Post(
-        content_type="post",
-        feather="photo",
-        title=title,
-        body=file_url,
-        clean=clean,
-        status=status,
-        user_id=current_user.id,
+        feather="photo", title=title, body=file_url, clean=clean,
+        status=status, user_id=current_user.id
     )
     db.add(db_post)
+
+    # --- ADD THIS LOGIC TO ATTACH TAGS AND CATEGORIES ---
+    tag_names = json.loads(tags)
+    final_tags = []
+    if tag_names:
+        for name in tag_names:
+            db_tag = db.query(models.Tag).filter(models.Tag.name.ilike(name.strip())).first()
+            if not db_tag:
+                db_tag = models.Tag(name=name.strip(), slug=create_slug(name.strip()))
+                db.add(db_tag)
+            final_tags.append(db_tag)
+    db_post.tags = final_tags
+
+    category_ids_list = json.loads(category_ids)
+    if category_ids_list:
+        db_post.categories = db.query(models.Category).filter(models.Category.id.in_(category_ids_list)).all()
+    # --- END OF NEW LOGIC ---
+
     db.commit()
     db.refresh(db_post)
     return db_post
@@ -481,28 +522,39 @@ async def create_quote_post(
     quote: str = Form(...),
     attribution: str = Form(...),
     status: str = Form("public"),
+    tags: str = Form('[]'),
+    category_ids: str = Form('[]'),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    # Prevent duplicate slug
     existing = db.query(models.Post).filter(models.Post.clean == clean).first()
     if existing:
         raise HTTPException(status_code=400, detail="A post with this slug already exists.")
 
-    # Create quote body with attribution
     quote_body = f'"{quote}"\n\n— {attribution}'
-
-    # Create a post with feather 'quote'
     db_post = models.Post(
-        content_type="post",
-        feather="quote",
-        title=None,  # Quotes typically don't have titles
-        body=quote_body,
-        clean=clean,
-        status=status,
-        user_id=current_user.id,
+        feather="quote", body=quote_body, clean=clean,
+        status=status, user_id=current_user.id
     )
     db.add(db_post)
+    
+    # --- ADD THIS LOGIC TO ATTACH TAGS AND CATEGORIES ---
+    tag_names = json.loads(tags)
+    final_tags = []
+    if tag_names:
+        for name in tag_names:
+            db_tag = db.query(models.Tag).filter(models.Tag.name.ilike(name.strip())).first()
+            if not db_tag:
+                db_tag = models.Tag(name=name.strip(), slug=create_slug(name.strip()))
+                db.add(db_tag)
+            final_tags.append(db_tag)
+    db_post.tags = final_tags
+
+    category_ids_list = json.loads(category_ids)
+    if category_ids_list:
+        db_post.categories = db.query(models.Category).filter(models.Category.id.in_(category_ids_list)).all()
+    # --- END OF NEW LOGIC ---
+
     db.commit()
     db.refresh(db_post)
     return db_post
@@ -514,146 +566,152 @@ async def create_link_post(
     url: str = Form(...),
     description: Optional[str] = Form(None),
     status: str = Form("public"),
+    tags: str = Form('[]'),
+    category_ids: str = Form('[]'),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    # Prevent duplicate slug
     existing = db.query(models.Post).filter(models.Post.clean == clean).first()
     if existing:
         raise HTTPException(status_code=400, detail="A post with this slug already exists.")
 
-    # Validate URL format
-    if not url.startswith(('http://', 'https://')):
-        url = f'https://{url}'
-
-    # Create link body with description
-    link_body = f'**{title}**\n\n[{url}]({url})'
+    link_body = url
     if description:
         link_body += f'\n\n{description}'
-
-    # Create a post with feather 'link'
+        
     db_post = models.Post(
-        content_type="post",
-        feather="link",
-        title=title,
-        body=link_body,
-        clean=clean,
-        status=status,
-        user_id=current_user.id,
+        feather="link", title=title, body=link_body, clean=clean,
+        status=status, user_id=current_user.id
     )
     db.add(db_post)
+    
+    # --- ADD THIS LOGIC TO ATTACH TAGS AND CATEGORIES ---
+    tag_names = json.loads(tags)
+    final_tags = []
+    if tag_names:
+        for name in tag_names:
+            db_tag = db.query(models.Tag).filter(models.Tag.name.ilike(name.strip())).first()
+            if not db_tag:
+                db_tag = models.Tag(name=name.strip(), slug=create_slug(name.strip()))
+                db.add(db_tag)
+            final_tags.append(db_tag)
+    db_post.tags = final_tags
+
+    category_ids_list = json.loads(category_ids)
+    if category_ids_list:
+        db_post.categories = db.query(models.Category).filter(models.Category.id.in_(category_ids_list)).all()
+    # --- END OF NEW LOGIC ---
+    
     db.commit()
     db.refresh(db_post)
     return db_post
+
 
 @app.post("/posts/video", response_model=schemas.PostModel, tags=["Posts"])
 async def create_video_post(
     clean: str = Form(...),
     title: Optional[str] = Form(None),
     status: str = Form("public"),
+    tags: str = Form('[]'),
+    category_ids: str = Form('[]'),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Create a video post by uploading a video file."""
-    # Prevent duplicate slug
     existing = db.query(models.Post).filter(models.Post.clean == clean).first()
     if existing:
         raise HTTPException(status_code=400, detail="A post with this slug already exists.")
 
-    # Validate file type
-    video_extensions = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv']
-    file_ext = os.path.splitext(file.filename)[1].lower()
-    
-    if not (file.content_type and file.content_type.startswith('video/')) and file_ext not in video_extensions:
-        raise HTTPException(status_code=400, detail="File must be a video")
-
-    # Upload to Supabase
+    # Upload logic remains the same...
     ext = os.path.splitext(file.filename)[1]
     unique_name = f"{uuid4().hex}{ext}"
-
     try:
         contents = await file.read()
-        supabase.storage.from_(BUCKET_NAME).upload(
-            path=unique_name,
-            file=contents,
-            file_options={"content-type": file.content_type}
-        )
+        supabase.storage.from_(BUCKET_NAME).upload(path=unique_name, file=contents, file_options={"content-type": file.content_type})
         file_url = supabase.storage.from_(BUCKET_NAME).get_public_url(unique_name)
-    
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
-    
     finally:
         await file.close()
 
-    # Create a post with feather 'video'
     db_post = models.Post(
-        content_type="post",
-        feather="video",
-        title=title,
-        body=file_url,
-        clean=clean,
-        status=status,
-        user_id=current_user.id,
+        feather="video", title=title, body=file_url, clean=clean,
+        status=status, user_id=current_user.id
     )
     db.add(db_post)
+
+    # --- ADD THIS LOGIC TO ATTACH TAGS AND CATEGORIES ---
+    tag_names = json.loads(tags)
+    final_tags = []
+    if tag_names:
+        for name in tag_names:
+            db_tag = db.query(models.Tag).filter(models.Tag.name.ilike(name.strip())).first()
+            if not db_tag:
+                db_tag = models.Tag(name=name.strip(), slug=create_slug(name.strip()))
+                db.add(db_tag)
+            final_tags.append(db_tag)
+    db_post.tags = final_tags
+
+    category_ids_list = json.loads(category_ids)
+    if category_ids_list:
+        db_post.categories = db.query(models.Category).filter(models.Category.id.in_(category_ids_list)).all()
+    # --- END OF NEW LOGIC ---
+    
     db.commit()
     db.refresh(db_post)
     return db_post
+
 
 @app.post("/posts/audio", response_model=schemas.PostModel, tags=["Posts"])
 async def create_audio_post(
     clean: str = Form(...),
     title: Optional[str] = Form(None),
     status: str = Form("public"),
+    tags: str = Form('[]'),
+    category_ids: str = Form('[]'),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Create an audio post by uploading an audio file."""
-    # Prevent duplicate slug
     existing = db.query(models.Post).filter(models.Post.clean == clean).first()
     if existing:
         raise HTTPException(status_code=400, detail="A post with this slug already exists.")
 
-    # Validate file type
-    audio_extensions = ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma']
-    file_ext = os.path.splitext(file.filename)[1].lower()
-    
-    if not (file.content_type and file.content_type.startswith('audio/')) and file_ext not in audio_extensions:
-        raise HTTPException(status_code=400, detail="File must be an audio file")
-
-    # Upload to Supabase
+    # Upload logic remains the same...
     ext = os.path.splitext(file.filename)[1]
     unique_name = f"{uuid4().hex}{ext}"
-
     try:
         contents = await file.read()
-        supabase.storage.from_(BUCKET_NAME).upload(
-            path=unique_name,
-            file=contents,
-            file_options={"content-type": file.content_type}
-        )
+        supabase.storage.from_(BUCKET_NAME).upload(path=unique_name, file=contents, file_options={"content-type": file.content_type})
         file_url = supabase.storage.from_(BUCKET_NAME).get_public_url(unique_name)
-    
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
-    
     finally:
         await file.close()
 
-    # Create a post with feather 'audio'
     db_post = models.Post(
-        content_type="post",
-        feather="audio",
-        title=title,
-        body=file_url,
-        clean=clean,
-        status=status,
-        user_id=current_user.id,
+        feather="audio", title=title, body=file_url, clean=clean,
+        status=status, user_id=current_user.id
     )
     db.add(db_post)
+    
+    # --- ADD THIS LOGIC TO ATTACH TAGS AND CATEGORIES ---
+    tag_names = json.loads(tags)
+    final_tags = []
+    if tag_names:
+        for name in tag_names:
+            db_tag = db.query(models.Tag).filter(models.Tag.name.ilike(name.strip())).first()
+            if not db_tag:
+                db_tag = models.Tag(name=name.strip(), slug=create_slug(name.strip()))
+                db.add(db_tag)
+            final_tags.append(db_tag)
+    db_post.tags = final_tags
+
+    category_ids_list = json.loads(category_ids)
+    if category_ids_list:
+        db_post.categories = db.query(models.Category).filter(models.Category.id.in_(category_ids_list)).all()
+    # --- END OF NEW LOGIC ---
+    
     db.commit()
     db.refresh(db_post)
     return db_post
@@ -715,3 +773,31 @@ def sitemap(db: Session = Depends(get_db)):
 </urlset>"""
 
     return Response(content=xml.strip(), media_type="application/xml")
+
+@app.get("/posts/by-category/{category_id}", response_model=List[schemas.PostModel], tags=["Posts"])
+def get_posts_by_category_id(
+    category_id: int,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db)
+):
+    """Get posts filtered by category ID."""
+    posts = db.query(models.Post).join(models.Post.categories).filter(
+        models.Category.id == category_id,
+        models.Post.status == 'public'
+    ).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
+    return posts
+
+@app.get("/posts/by-tag/{tag_id}", response_model=List[schemas.PostModel], tags=["Posts"])
+def get_posts_by_tag_id(
+    tag_id: int,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db)
+):
+    """Get posts filtered by tag ID."""
+    posts = db.query(models.Post).join(models.Post.tags).filter(
+        models.Tag.id == tag_id,
+        models.Post.status == 'public'
+    ).order_by(models.Post.created_at.desc()).offset(skip).limit(limit).all()
+    return posts

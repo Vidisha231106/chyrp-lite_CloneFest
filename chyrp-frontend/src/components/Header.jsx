@@ -1,26 +1,23 @@
+// src/components/Header.jsx
+
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import SearchBar from './SearchBar';
 import './Header.css';
 
 const Header = () => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      // In a real app, this would search through posts
-      console.log('Searching for:', searchQuery);
-    }
-  };
+  // 1. Check for the token directly from localStorage
+  const token = localStorage.getItem('token');
 
+  // 2. Create a logout handler that removes the token
   const handleLogout = () => {
-    logout();
+    localStorage.removeItem('token');
     navigate('/');
+    window.location.reload(); // Force a refresh to update the header
   };
 
   const isActive = (path) => location.pathname === path;
@@ -33,54 +30,42 @@ const Header = () => {
             My Awesome Site
           </Link>
 
-          <form className="search-form" onSubmit={handleSearch}>
-            <input
-              type="text"
-              placeholder="Search posts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="search-input"
-            />
-            <button type="submit" className="search-btn">
-              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </button>
-          </form>
+          <SearchBar />
 
           <nav className={`nav ${isMenuOpen ? 'nav-open' : ''}`}>
-            <Link 
-              to="/" 
+            <Link
+              to="/"
               className={`nav-link ${isActive('/') ? 'active' : ''}`}
               onClick={() => setIsMenuOpen(false)}
             >
               Blog
             </Link>
-            <Link 
-              to="/about" 
+            <Link
+              to="/about"
               className={`nav-link ${isActive('/about') ? 'active' : ''}`}
               onClick={() => setIsMenuOpen(false)}
             >
               About
             </Link>
-            <Link 
-              to="/contact" 
+            <Link
+              to="/contact"
               className={`nav-link ${isActive('/contact') ? 'active' : ''}`}
               onClick={() => setIsMenuOpen(false)}
             >
               Contact
             </Link>
-            
-            {user ? (
+
+            {/* 3. Use the token to decide which links to show */}
+            {token ? (
               <>
-                <Link 
-                  to="/create-post" 
+                <Link
+                  to="/create-post"
                   className={`nav-link ${isActive('/create-post') ? 'active' : ''}`}
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Create Post
                 </Link>
-                <button 
+                <button
                   onClick={() => {
                     handleLogout();
                     setIsMenuOpen(false);
@@ -91,8 +76,8 @@ const Header = () => {
                 </button>
               </>
             ) : (
-              <Link 
-                to="/login" 
+              <Link
+                to="/login"
                 className={`nav-link ${isActive('/login') ? 'active' : ''}`}
                 onClick={() => setIsMenuOpen(false)}
               >
@@ -101,7 +86,7 @@ const Header = () => {
             )}
           </nav>
 
-          <button 
+          <button
             className="menu-toggle"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label="Toggle menu"

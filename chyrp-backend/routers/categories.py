@@ -5,10 +5,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
 import re
-
+import schemas
 from dependencies import get_db, get_current_user, require_permission
 from models import Category, Post, User
-import schemas
+from schemas import CategoryModel, PaginatedPosts # <-- EDIT THIS LINE
 from cache import cache_for_1_hour, cache_for_5_minutes
 
 router = APIRouter(
@@ -247,17 +247,29 @@ def remove_category_from_post(
     db.refresh(post)
     return post
 
-@router.get("/categories/{category_id}/posts", response_model=List[schemas.PostModel])
+@router.get("/categories/{category_id}/posts", response_model=PaginatedPosts)
 def get_posts_by_category(
     category_id: int,
     skip: int = 0,
     limit: int = 20,
     db: Session = Depends(get_db)
 ):
-    """Get all posts with a specific category."""
+    """Get all public posts with a specific category."""
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
     
-    posts = db.query(Post).join(Post.categories).filter(Category.id == category_id).offset(skip).limit(limit).all()
-    return posts
+    # Add a filter for Post.status
+    posts = db.query(Post).join(Post.categories).filter(
+        Category.id == category_id,
+        Post.status == 'public' # <-- ADD THIS LINE
+    ).order_by(Post.created_at.desc()).offset(skip).limit(limit).all()
+    
+    # Return the data in the format the frontend expects
+    return {"posts": posts}
+
+@router.get("/categories/for-dropdown", response_model=List[schemas.CategoryModel])
+def get_categories_for_dropdown(db: Session = Depends(get_db)):
+    """Get all categories for dropdown selection (no pagination)."""
+    categories = db.query(Category).order_by(Category.name).all()
+    return categories
