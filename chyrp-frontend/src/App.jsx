@@ -5,7 +5,7 @@ import Layout from './components/Layout';
 import Home from './pages/Home';
 import Post from './pages/Post';
 import About from './pages/About';
-// import Contact from './pages/Contact'; // Assuming you have this file
+import CategoriesPage from './pages/CategoriesPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import CreatePost from './pages/CreatePost';
@@ -27,7 +27,7 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
-          {/* <Route path="/contact" element={<Contact />} /> */}
+          <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/posts/:postId" element={<Post />} />
@@ -38,21 +38,21 @@ function App() {
           <Route path="/categories/:slug" element={<CategoryPosts />} />
 
           {/* Protected Routes */}
-          <Route 
-            path="/create-post" 
+          <Route
+            path="/create-post"
             element={
               <ProtectedRoute>
                 <CreatePost />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/edit-post/:postId" 
+          <Route
+            path="/edit-post/:postId"
             element={
               <ProtectedRoute>
                 <EditPost />
               </ProtectedRoute>
-            } 
+            }
           />
         </Routes>
       </Layout>

@@ -1,0 +1,59 @@
+/* src/pages/CategoriesPage.css */
+
+.categories-page .container {
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+}
+
+.categories-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.categories-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.categories-header p {
+  font-size: 1.1rem;
+  color: #666;
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.category-card-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.category-card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border-top: 5px solid #ddd; /* Default color */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  height: 100%;
+}
+
+.category-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.category-card-name {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  font-size: 1.5rem;
+}
+
+.category-card-description {
+  font-size: 0.95rem;
+  color: #555;
+  line-height: 1.5;
+}

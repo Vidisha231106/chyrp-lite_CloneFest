@@ -33,13 +33,7 @@ const Header = () => {
           <SearchBar />
 
           <nav className={`nav ${isMenuOpen ? 'nav-open' : ''}`}>
-            <Link
-              to="/"
-              className={`nav-link ${isActive('/') ? 'active' : ''}`}
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Blog
-            </Link>
+
             <Link
               to="/about"
               className={`nav-link ${isActive('/about') ? 'active' : ''}`}
@@ -47,12 +41,15 @@ const Header = () => {
             >
               About
             </Link>
-            <Link
-              to="/contact"
-              className={`nav-link ${isActive('/contact') ? 'active' : ''}`}
+                        <Link
+              to="/"
+              className={`nav-link ${isActive('/') ? 'active' : ''}`}
               onClick={() => setIsMenuOpen(false)}
             >
-              Contact
+              Latest Blogs
+            </Link>
+            <Link to="/categories" className={`nav-link ${isActive('/categories') ? 'active' : ''}`} onClick={() => setIsMenuOpen(false)}>
+              Categories
             </Link>
 
             {/* 3. Use the token to decide which links to show */}
