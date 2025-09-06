@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import apiClient from '../api';
 import Comments from '../components/Comments';
@@ -12,34 +13,26 @@ import './Post.css';
 
 const Post = () => {
   const [post, setPost] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const { postId } = useParams();
+  const [error, setError] = useState('');
+  const { id } = useParams();
   const navigate = useNavigate();
 
   // src/pages/Post.jsx
+  const { user } = useAuth();
 
   useEffect(() => {
-    const fetchPostAndUser = async () => {
+    const fetchPost = async () => {
       try {
-        // --- Step 1: Fetch the post data ---
         const postResponse = await apiClient.get(`/posts/${postId}`);
         setPost(postResponse.data);
 
-        // --- Step 2 (NEW): Record the view ---
-        // This is a "fire-and-forget" call; we don't need the response.
-        // A separate try/catch ensures that if this fails, the post still loads.
-        try {
-          apiClient.post(`/views/posts/${postId}`);
-        } catch (viewError) {
-          console.error("Failed to record view:", viewError);
-        }
-
-        // --- Step 3: Fetch the current user ---
+        // This will fail gracefully if the user is not logged in
         const userResponse = await apiClient.get('/users/me');
         setCurrentUser(userResponse.data);
       } catch (error) {
+        // If getting the user fails, we still have the post data
         if (error.response?.status !== 401) {
           console.error("Error fetching data:", error);
         }
@@ -47,10 +40,21 @@ const Post = () => {
         setLoading(false);
       }
     };
-    fetchPostAndUser();
-  }, [postId]);
 
-  
+    fetchPost();
+  }, [id]);
+
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to delete this post?')) {
+      try {
+        await apiClient.delete(`/posts/${postId}`);
+        navigate('/');
+      } catch {
+        alert('Failed to delete post. You may not have permission.');
+      }
+    }
+  };
+
   const handleLike = async () => {
     if (!currentUser) {
       alert("You must be logged in to like a post.");
@@ -87,14 +91,10 @@ const Post = () => {
       <header className="post-header">
         <Link to="/" className="back-link">← Back to Home</Link>
         <h1>{post.title || post.clean}</h1>
-        {/* --- UPDATED META SECTION --- */}
-        <div className="post-card-meta">
+        <div className="post-meta">
           <span>By {post.owner.login}</span>
+          {/* --- THIS IS THE CORRECTED LINE --- */}
           <span>{new Date(post.created_at).toLocaleDateString()}</span>
-          <span className="post-card-stats">
-            ❤️ {post.likes_count}
-            <span style={{ marginLeft: '10px' }}>💬 {post.comments_count}</span>
-          </span>
           {canEdit && <Link to={`/edit-post/${post.id}`} className="btn-edit">Edit</Link>}
           {canDelete && <button onClick={handleDelete} className="btn-delete">Delete</button>}
         </div>
@@ -125,101 +125,42 @@ const Post = () => {
           </div>
         ) : null}
       </header>
-      <div className="post-content">
-        {post.feather === 'photo' ? (
+
+      {/* Post content */}
+      <div className="post-content prose prose-invert max-w-none">
+        {post.feather === 'photo' && post.body?.startsWith('/uploads/') ? (
           <img
-            src={post.body}
+            src={`http://127.0.0.1:8000${post.body}`}
             alt={post.title || post.clean}
-            style={{ maxWidth: '100%', height: 'auto', cursor: 'pointer' }}
-            onClick={() => setLightboxOpen(true)}
-            className="post-image"
+            style={{ maxWidth: '100%', height: 'auto' }}
           />
         ) : post.feather === 'quote' ? (
-          <blockquote style={{
-            borderLeft: '4px solid #007bff',
-            paddingLeft: '20px',
-            margin: '20px 0',
-            fontStyle: 'italic',
-            fontSize: '1.2em',
-            lineHeight: '1.6',
-            color: '#333'
-          }}>
+          <blockquote className="border-l-4 border-primary-500 pl-4 italic text-lg text-gray-300">
             <ReactMarkdown>{post.body || ''}</ReactMarkdown>
           </blockquote>
-        ) : post.feather === 'video' ? (
-          <div className="video-container" style={{
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            padding: '20px',
-            margin: '20px 0',
-            backgroundColor: '#f9f9f9'
-          }}>
-            <video
-              controls
-              style={{
-                width: '100%',
-                maxWidth: '800px',
-                height: 'auto',
-                borderRadius: '4px'
-              }}
-            >
-              <source src={post.body} type="video/mp4" />
-              <source src={post.body} type="video/webm" />
-              <source src={post.body} type="video/ogg" />
-              Your browser does not support the video tag.
-            </video>
-            {post.title && <p style={{ marginTop: '10px', fontStyle: 'italic' }}>{post.title}</p>}
-          </div>
-        ) : post.feather === 'audio' ? (
-          <div className="audio-container" style={{
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            padding: '20px',
-            margin: '20px 0',
-            backgroundColor: '#f9f9f9'
-          }}>
-            <audio
-              controls
-              style={{
-                width: '100%',
-                maxWidth: '600px'
-              }}
-            >
-              <source src={post.body} type="audio/mpeg" />
-              <source src={post.body} type="audio/wav" />
-              <source src={post.body} type="audio/ogg" />
-              Your browser does not support the audio tag.
-            </audio>
-            {post.title && <p style={{ marginTop: '10px', fontStyle: 'italic' }}>{post.title}</p>}
-          </div>
         ) : post.feather === 'link' ? (
-          <div>
-            <EmbedPreview url={post.body} content={post.body} />
-            {post.title && (
-              <div style={{
-                marginTop: '1rem',
-                padding: '1rem',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '8px',
-                border: '1px solid #e9ecef'
-              }}>
-                <ReactMarkdown
-                  components={{
-                    a: ({ href, children }) => (
-                      <a href={href} target="_blank" rel="noopener noreferrer" style={{
-                        color: '#007bff',
-                        textDecoration: 'underline',
-                        fontWeight: 'bold'
-                      }}>
-                        {children} 🔗
-                      </a>
-                    )
-                  }}
-                >
-                  {post.title}
-                </ReactMarkdown>
-              </div>
-            )}
+          <div style={{
+            border: '1px solid #ddd',
+            borderRadius: '8px',
+            padding: '20px',
+            margin: '20px 0',
+            backgroundColor: '#f9f9f9'
+          }}>
+            <ReactMarkdown
+              components={{
+                a: ({ href, children }) => (
+                  <a href={href} target="_blank" rel="noopener noreferrer" style={{
+                    color: '#007bff',
+                    textDecoration: 'underline',
+                    fontWeight: 'bold'
+                  }}>
+                    {children} 🔗
+                  </a>
+                )
+              }}
+            >
+              {post.body || ''}
+            </ReactMarkdown>
           </div>
         ) : (
           <EnhancedContent content={post.body || ''} />
@@ -237,17 +178,6 @@ const Post = () => {
           {post.likes_count} {post.likes_count === 1 ? 'like' : 'likes'}
         </span>
       </footer>
-
-      {/* Comments Section */}
-      <Comments postId={post.id} currentUser={currentUser} />
-
-      {/* Lightbox */}
-      <Lightbox
-        isOpen={lightboxOpen}
-        onClose={() => setLightboxOpen(false)}
-        postId={post.id}
-        images={post.feather === 'photo' ? [{ url: post.body, alt: post.title || post.clean }] : []}
-      />
     </div>
   );
 };

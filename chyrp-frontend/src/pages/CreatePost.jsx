@@ -8,9 +8,10 @@ import './CreatePost.css';
 
 const CreatePost = () => {
   const [title, setTitle] = useState('');
-  const [clean, setClean] = useState(''); // URL Slug
+  const [clean, setClean] = useState('');
   const [body, setBody] = useState('');
   const [isPage, setIsPage] = useState(false);
+
   const [feather, setFeather] = useState('text'); // 'text' | 'photo' | 'quote' | 'link' | 'video' | 'audio'
   const [photoFile, setPhotoFile] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
@@ -22,7 +23,7 @@ const CreatePost = () => {
   const [status, setStatus] = useState('draft'); // 'draft' or 'public'
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  
+
   // --- NEW: State for AI processing ---
   const [isEnhancing, setIsEnhancing] = useState(false);
 
@@ -45,7 +46,6 @@ const CreatePost = () => {
     }
   };
 
-
   const handleUploadComplete = (uploadedUrls) => {
     console.log('Files uploaded successfully:', uploadedUrls);
     // You can add logic here to handle the uploaded URLs
@@ -56,126 +56,48 @@ const CreatePost = () => {
     e.preventDefault();
     setError('');
 
+    const postData = {
+      content_type: isPage ? 'page' : 'post',
+      title,
+      body,
+      clean,
+      status,
+    };
+
     try {
-      if (feather === 'photo') {
-        if (!photoFile) {
-          setError('Please choose an image to upload.');
-          return;
-        }
-        const form = new FormData();
-        form.append('clean', clean);
-        form.append('title', title);
-        form.append('status', status);
-        form.append('file', photoFile);
-        await apiClient.post('/posts/photo', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      } else if (feather === 'quote') {
-        if (!quote.trim() || !attribution.trim()) {
-          setError('Please enter both quote and attribution.');
-          return;
-        }
-        const form = new FormData();
-        form.append('clean', clean);
-        form.append('quote', quote);
-        form.append('attribution', attribution);
-        form.append('status', status);
-        await apiClient.post('/posts/quote', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      } else if (feather === 'link') {
-        if (!title.trim() || !url.trim()) {
-          setError('Please enter both title and URL.');
-          return;
-        }
-        const form = new FormData();
-        form.append('clean', clean);
-        form.append('title', title);
-        form.append('url', url);
-        form.append('description', description);
-        form.append('status', status);
-        await apiClient.post('/posts/link', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      } else if (feather === 'video') {
-        if (!videoFile) {
-          setError('Please choose a video file to upload.');
-          return;
-        }
-        const form = new FormData();
-        form.append('clean', clean);
-        form.append('title', title);
-        form.append('status', status);
-        form.append('file', videoFile);
-        await apiClient.post('/posts/video', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      } else if (feather === 'audio') {
-        if (!audioFile) {
-          setError('Please choose an audio file to upload.');
-          return;
-        }
-        const form = new FormData();
-        form.append('clean', clean);
-        form.append('title', title);
-        form.append('status', status);
-        form.append('file', audioFile);
-        await apiClient.post('/posts/audio', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      } else {
-        const postData = {
-          content_type: isPage ? 'page' : 'post',
-          title,
-          body,
-          clean,
-          status,
-          feather: 'text',
-        };
-        await apiClient.post('/posts/', postData);
-      }
+      await apiClient.post('/posts/', postData);
       navigate('/');
     } catch (err) {
-      let detail = err?.response?.data?.detail;
-      if (!detail && typeof err?.response?.data === 'object') {
-        try { detail = JSON.stringify(err.response.data); } catch {
-          if (!photoFile) {
-            setError('Please choose an image to upload.');
-            return;
-          }
-        }
-      }
-      setError(detail ? `Failed: ${detail}` : 'Failed to create post. Please try again.');
+      setError('Failed to create post. Please try again.');
     }
   };
 
   return (
-    <div className="create-post-container">
-      <h1>Create New {isPage ? 'Page' : 'Post'}</h1>
-
-      <div className="content-type-toggle">
-        <label>
-          <input type="checkbox" checked={isPage} onChange={(e) => setIsPage(e.target.checked)} />
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8 bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">
+        Create New {isPage ? 'Page' : 'Post'}
+      </h1>
+      
+      <div className="flex items-center gap-2 mb-6">
+        <label className="flex items-center gap-2 text-gray-300 cursor-pointer">
+          <input 
+            type="checkbox" 
+            checked={isPage} 
+            onChange={(e) => setIsPage(e.target.checked)}
+            className="rounded bg-slate-800 border-purple-500/20 text-purple-500 focus:ring-purple-500/20" 
+          />
           Create as a static page
         </label>
       </div>
 
-      {error && <p className="error-message">{error}</p>}
-
-      <form onSubmit={handleSubmit}>
-        {/* Feather Type Selection */}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
-          <strong>Post Type:</strong>
-          <label>
-            <input type="radio" name="feather" value="text" checked={feather === 'text'} onChange={() => setFeather('text')} /> Text
-          </label>
-          <label>
-            <input type="radio" name="feather" value="photo" checked={feather === 'photo'} onChange={() => setFeather('photo')} /> Photo
-          </label>
-          <label>
-            <input type="radio" name="feather" value="quote" checked={feather === 'quote'} onChange={() => setFeather('quote')} /> Quote
-          </label>
-          <label>
-            <input type="radio" name="feather" value="link" checked={feather === 'link'} onChange={() => setFeather('link')} /> Link
-          </label>
-          <label>
-            <input type="radio" name="feather" value="video" checked={feather === 'video'} onChange={() => setFeather('video')} /> Video
-          </label>
-          <label>
-            <input type="radio" name="feather" value="audio" checked={feather === 'audio'} onChange={() => setFeather('audio')} /> Audio
-          </label>
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg mb-6">
+          {error}
         </div>
+      )}
 
+      {/* ✅ Added the missing <form> wrapper */}
+      <form onSubmit={handleSubmit}>
         {/* Title field - hide for quote posts */}
         {feather !== 'quote' && (
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" required />
@@ -228,9 +150,12 @@ const CreatePost = () => {
         <div className="form-actions">
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="draft">Save as Draft</option>
-            <option value="public">Publish/</option>
+            <option value="public">Publish</option>
           </select>
-          <button type="submit">Submit</button>
+          
+          <button type="submit" className="btn">
+            Submit
+          </button>
         </div>
       </form>
       
